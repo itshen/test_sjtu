@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>市场偏离度计算系统 - 洛小山</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .card-shadow {
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+        .animate-float {
+            animation: float 3s ease-in-out infinite;
+        }
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+        }
+        .result-highlight {
+            background: linear-gradient(45deg, #ff6b6b, #ee5a52);
+            background-size: 100%;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- 头部 -->
+    <header class="gradient-bg text-white shadow-lg">
+        <div class="container mx-auto px-6 py-4">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h1 class="text-3xl font-bold">市场偏离度计算系统</h1>
+                    <p class="text-blue-100 mt-1">基于欧几里得距离的智能分析平台</p>
+                </div>
+                <div class="text-right">
+                    <p class="text-sm text-blue-200">作者: 洛小山 (Luoxiaoshan)</p>
+                    <p class="text-sm text-blue-200">GitHub: https://github.com/itshen</p>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="container mx-auto px-6 py-8">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <!-- 左侧控制面板 -->
+            <div class="space-y-6">
+                <!-- 选择控件 -->
+                <div class="bg-white rounded-lg card-shadow p-6">
+                    <h2 class="text-2xl font-semibold text-gray-800 mb-6 flex items-center">
+                        <svg class="w-6 h-6 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4"></path>
+                        </svg>
+                        参数设置
+                    </h2>
+                    
+                    <!-- 轮次选择 -->
+                    <div class="mb-6">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">选择轮次</label>
+                        <select id="quarterSelect" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200">
+                            <option value="Q1">Q1 第一季度</option>
+                            <option value="Q2">Q2 第二季度</option>
+                            <option value="Q3">Q3 第三季度</option>
+                            <option value="Q4">Q4 第四季度</option>
+                            <option value="Q5">Q5 第五季度 (预测)</option>
+                            <option value="Q6">Q6 第六季度 (预测)</option>
+                        </select>
+                    </div>
+
+                    <!-- 目标市场选择 -->
+                    <div class="mb-6">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">目标市场</label>
+                        <div class="grid grid-cols-3 gap-3">
+                            <button onclick="selectMarket('euphoria')" class="market-btn p-3 border-2 border-gray-300 rounded-lg text-center hover:border-blue-500 hover:bg-blue-50 transition duration-200" data-market="euphoria">
+                                <div class="font-semibold text-purple-600">尤菲亚</div>
+                                <div class="text-xs text-gray-500">EUPHORIA</div>
+                            </button>
+                            <button onclick="selectMarket('ledakka')" class="market-btn p-3 border-2 border-gray-300 rounded-lg text-center hover:border-blue-500 hover:bg-blue-50 transition duration-200" data-market="ledakka">
+                                <div class="font-semibold text-green-600">纳达卡</div>
+                                <div class="text-xs text-gray-500">LEDAKKA</div>
+                            </button>
+                            <button onclick="selectMarket('nihono')" class="market-btn p-3 border-2 border-gray-300 rounded-lg text-center hover:border-blue-500 hover:bg-blue-50 transition duration-200" data-market="nihono">
+                                <div class="font-semibold text-blue-600">尼赫鲁</div>
+                                <div class="text-xs text-gray-500">NIHONO</div>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 产品选择 -->
+                    <div class="mb-6">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">产品类型</label>
+                        <div class="grid grid-cols-3 gap-3">
+                            <button onclick="selectProduct('rehm1')" class="product-btn p-3 border-2 border-gray-300 rounded-lg text-center hover:border-green-500 hover:bg-green-50 transition duration-200" data-product="rehm1">
+                                <div class="font-semibold">雷墨磁 1</div>
+                                <div class="text-xs text-gray-500">REHM 1</div>
+                            </button>
+                            <button onclick="selectProduct('rehm2')" class="product-btn p-3 border-2 border-gray-300 rounded-lg text-center hover:border-green-500 hover:bg-green-50 transition duration-200" data-product="rehm2">
+                                <div class="font-semibold">雷墨磁 2</div>
+                                <div class="text-xs text-gray-500">REHM 2</div>
+                            </button>
+                            <button onclick="selectProduct('rehm3')" class="product-btn p-3 border-2 border-gray-300 rounded-lg text-center hover:border-green-500 hover:bg-green-50 transition duration-200" data-product="rehm3">
+                                <div class="font-semibold">雷墨磁 3</div>
+                                <div class="text-xs text-gray-500">REHM 3</div>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 产品性能输入 -->
+                <div class="bg-white rounded-lg card-shadow p-6">
+                    <h3 class="text-xl font-semibold text-gray-800 mb-4 flex items-center">
+                        <svg class="w-5 h-5 mr-2 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+                        </svg>
+                        产品性能参数
+                    </h3>
+                    
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">扭矩 (Torque)</label>
+                            <input type="number" id="torqueInput" step="0.01" min="0" max="10" 
+                                   class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition duration-200"
+                                   placeholder="请输入扭矩值 (例: 4.24)" oninput="calculateDeviation()">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">电阻 (Resistance)</label>
+                            <input type="number" id="resistanceInput" step="0.01" min="0" max="10" 
+                                   class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition duration-200"
+                                   placeholder="请输入电阻值 (例: 3.75)" oninput="calculateDeviation()">
+                        </div>
+                    </div>
+
+                    <!-- 计算按钮 -->
+                    <button onclick="calculateDeviation()" class="w-full mt-6 bg-gradient-to-r from-green-500 to-blue-600 text-white py-3 px-6 rounded-lg font-semibold hover:from-green-600 hover:to-blue-700 transform hover:scale-105 transition duration-200 shadow-lg">
+                        🔍 计算偏离度
+                    </button>
+                </div>
+            </div>
+
+            <!-- 右侧结果面板 -->
+            <div class="space-y-6">
+                <!-- 市场理想值显示 -->
+                <div class="bg-white rounded-lg card-shadow p-6">
+                    <h3 class="text-xl font-semibold text-gray-800 mb-4 flex items-center">
+                        <svg class="w-5 h-5 mr-2 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                        </svg>
+                        市场理想值
+                    </h3>
+                    
+                    <div id="idealValues" class="space-y-3">
+                        <div class="text-gray-500 text-center py-8">
+                            请选择轮次、市场和产品类型
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 计算结果 -->
+                <div class="bg-white rounded-lg card-shadow p-6">
+                    <h3 class="text-xl font-semibold text-gray-800 mb-4 flex items-center">
+                        <svg class="w-5 h-5 mr-2 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v4"></path>
+                        </svg>
+                        偏离度结果
+                    </h3>
+                    
+                    <div id="calculationResult">
+                        <div class="text-gray-500 text-center py-8">
+                            输入产品参数后将显示计算结果
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 趋势图表 -->
+                <div class="bg-white rounded-lg card-shadow p-6">
+                    <h3 class="text-xl font-semibold text-gray-800 mb-4 flex items-center">
+                        <svg class="w-5 h-5 mr-2 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"></path>
+                        </svg>
+                        理想值趋势图
+                    </h3>
+                    
+                    <div class="relative h-64">
+                        <canvas id="trendChart" width="400" height="200"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 底部信息 -->
+    <footer class="bg-gray-800 text-white py-6 mt-12">
+        <div class="container mx-auto px-6 text-center">
+            <p class="text-gray-300">
+                基于欧几里得距离公式: <span class="font-mono bg-gray-700 px-2 py-1 rounded">√[(产品扭矩 - 目标扭矩)² + (产品电阻 - 目标电阻)²]</span>
+            </p>
+            <p class="text-gray-400 mt-2">© 2024 洛小山 (Luoxiaoshan) - 市场偏离度分析系统</p>
+        </div>
+    </footer>
+
+    <script>
+        // 市场数据 (从 Python 分析生成)
+        const marketData = {
+            "euphoria": {
+                "rehm1": {
+                    "torque": {"Q1": 4.2, "Q2": 3.9, "Q3": 3.6, "Q4": 3.2, "Q5": 2.9, "Q6": 2.57},
+                    "resistance": {"Q1": 3.9, "Q2": 3.9, "Q3": 3.7, "Q4": 3.6, "Q5": 3.5, "Q6": 3.39}
+                },
+                "rehm2": {
+                    "torque": {"Q1": 2.5, "Q2": 2.6, "Q3": 2.6, "Q4": 2.7, "Q5": 2.75, "Q6": 2.81},
+                    "resistance": {"Q1": 2.4, "Q2": 2.5, "Q3": 2.5, "Q4": 2.6, "Q5": 2.65, "Q6": 2.71}
+                },
+                "rehm3": {
+                    "torque": {"Q1": 1.9, "Q2": 2.2, "Q3": 2.6, "Q4": 2.9, "Q5": 3.25, "Q6": 3.59},
+                    "resistance": {"Q1": 3.5, "Q2": 3.5, "Q3": 3.5, "Q4": 3.5, "Q5": 3.5, "Q6": 3.5}
+                }
+            },
+            "ledakka": {
+                "rehm1": {
+                    "torque": {"Q1": 4.0, "Q2": 3.8, "Q3": 3.6, "Q4": 3.4, "Q5": 3.2, "Q6": 3.0},
+                    "resistance": {"Q1": 4.3, "Q2": 4.3, "Q3": 4.2, "Q4": 4.1, "Q5": 4.05, "Q6": 3.98}
+                },
+                "rehm2": {
+                    "torque": {"Q1": 2.6, "Q2": 2.5, "Q3": 2.5, "Q4": 2.5, "Q5": 2.45, "Q6": 2.42},
+                    "resistance": {"Q1": 2.6, "Q2": 2.6, "Q3": 2.7, "Q4": 2.7, "Q5": 2.75, "Q6": 2.79}
+                },
+                "rehm3": {
+                    "torque": {"Q1": 1.1, "Q2": 1.2, "Q3": 1.3, "Q4": 1.4, "Q5": 1.5, "Q6": 1.6},
+                    "resistance": {"Q1": 1.5, "Q2": 1.5, "Q3": 1.5, "Q4": 1.5, "Q5": 1.5, "Q6": 1.5}
+                }
+            },
+            "nihono": {
+                "rehm1": {
+                    "torque": {"Q1": 4.0, "Q2": 4.2, "Q3": 4.3, "Q4": 4.5, "Q5": 4.65, "Q6": 4.81},
+                    "resistance": {"Q1": 2.2, "Q2": 2.4, "Q3": 2.5, "Q4": 2.7, "Q5": 2.85, "Q6": 3.01}
+                },
+                "rehm2": {
+                    "torque": {"Q1": 3.5, "Q2": 3.7, "Q3": 3.8, "Q4": 4.2, "Q5": 4.35, "Q6": 4.57},
+                    "resistance": {"Q1": 2.7, "Q2": 2.7, "Q3": 2.8, "Q4": 2.9, "Q5": 2.95, "Q6": 3.02}
+                },
+                "rehm3": {
+                    "torque": {"Q1": 4.4, "Q2": 4.2, "Q3": 3.9, "Q4": 3.7, "Q5": 3.45, "Q6": 3.21},
+                    "resistance": {"Q1": 1.5, "Q2": 1.5, "Q3": 1.6, "Q4": 1.7, "Q5": 1.75, "Q6": 1.82}
+                }
+            }
+        };
+
+        // 全局变量
+        let selectedMarket = null;
+        let selectedProduct = null;
+        let chart = null;
+
+        // 市场名称映射
+        const marketNames = {
+            'euphoria': '尤菲亚 (EUPHORIA)',
+            'ledakka': '纳达卡 (LEDAKKA)',
+            'nihono': '尼赫鲁 (NIHONO)'
+        };
+
+        const productNames = {
+            'rehm1': '雷墨磁 1',
+            'rehm2': '雷墨磁 2',
+            'rehm3': '雷墨磁 3'
+        };
+
+        // 选择市场
+        function selectMarket(market) {
+            selectedMarket = market;
+            
+            // 更新UI状态
+            document.querySelectorAll('.market-btn').forEach(btn => {
+                btn.classList.remove('border-blue-500', 'bg-blue-50');
+                btn.classList.add('border-gray-300');
+            });
+            
+            document.querySelector(`[data-market="${market}"]`).classList.add('border-blue-500', 'bg-blue-50');
+            document.querySelector(`[data-market="${market}"]`).classList.remove('border-gray-300');
+            
+            updateIdealValues();
+            updateChart();
+        }
+
+        // 选择产品
+        function selectProduct(product) {
+            selectedProduct = product;
+            
+            // 更新UI状态
+            document.querySelectorAll('.product-btn').forEach(btn => {
+                btn.classList.remove('border-green-500', 'bg-green-50');
+                btn.classList.add('border-gray-300');
+            });
+            
+            document.querySelector(`[data-product="${product}"]`).classList.add('border-green-500', 'bg-green-50');
+            document.querySelector(`[data-product="${product}"]`).classList.remove('border-gray-300');
+            
+            updateIdealValues();
+            updateChart();
+        }
+
+        // 更新理想值显示
+        function updateIdealValues() {
+            const quarter = document.getElementById('quarterSelect').value;
+            const idealValuesDiv = document.getElementById('idealValues');
+            
+            if (!selectedMarket || !selectedProduct) {
+                idealValuesDiv.innerHTML = '<div class="text-gray-500 text-center py-8">请选择市场和产品类型</div>';
+                return;
+            }
+            
+            const data = marketData[selectedMarket][selectedProduct];
+            const torque = data.torque[quarter];
+            const resistance = data.resistance[quarter];
+            const isPredicted = quarter === 'Q5' || quarter === 'Q6';
+            
+            idealValuesDiv.innerHTML = `
+                <div class="bg-gradient-to-r from-blue-50 to-purple-50 p-4 rounded-lg border-l-4 border-blue-500">
+                    <div class="flex items-center justify-between mb-3">
+                        <h4 class="font-semibold text-gray-800">${marketNames[selectedMarket]} - ${productNames[selectedProduct]}</h4>
+                        ${isPredicted ? '<span class="bg-orange-100 text-orange-600 px-2 py-1 rounded text-xs font-medium">预测值</span>' : '<span class="bg-green-100 text-green-600 px-2 py-1 rounded text-xs font-medium">历史数据</span>'}
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="text-center">
+                            <div class="text-2xl font-bold text-blue-600">${torque.toFixed(2)}</div>
+                            <div class="text-sm text-gray-600">扭矩 (Torque)</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="text-2xl font-bold text-purple-600">${resistance.toFixed(2)}</div>
+                            <div class="text-sm text-gray-600">电阻 (Resistance)</div>
+                        </div>
+                    </div>
+                    <div class="mt-3 text-xs text-gray-500 text-center">
+                        ${quarter} ${isPredicted ? '(基于线性回归预测)' : ''}
+                    </div>
+                </div>
+            `;
+        }
+
+        // 计算偏离度
+        function calculateDeviation() {
+            const torqueInput = parseFloat(document.getElementById('torqueInput').value);
+            const resistanceInput = parseFloat(document.getElementById('resistanceInput').value);
+            const quarter = document.getElementById('quarterSelect').value;
+            const resultDiv = document.getElementById('calculationResult');
+            
+            if (!selectedMarket || !selectedProduct) {
+                resultDiv.innerHTML = '<div class="text-amber-600 text-center py-4">⚠️ 请先选择目标市场和产品类型</div>';
+                return;
+            }
+            
+            if (isNaN(torqueInput) || isNaN(resistanceInput)) {
+                resultDiv.innerHTML = '<div class="text-amber-600 text-center py-4">⚠️ 请输入有效的扭矩和电阻值</div>';
+                return;
+            }
+            
+            // 获取目标理想值
+            const data = marketData[selectedMarket][selectedProduct];
+            const targetTorque = data.torque[quarter];
+            const targetResistance = data.resistance[quarter];
+            
+            // 计算欧几里得距离
+            const deviation = Math.sqrt(
+                Math.pow(torqueInput - targetTorque, 2) + 
+                Math.pow(resistanceInput - targetResistance, 2)
+            );
+            
+            // 计算各项差值
+            const torqueDiff = Math.abs(torqueInput - targetTorque);
+            const resistanceDiff = Math.abs(resistanceInput - targetResistance);
+            
+            // 判断偏离等级
+            let deviationLevel = '';
+            let levelColor = '';
+            if (deviation < 0.1) {
+                deviationLevel = '极小偏离';
+                levelColor = 'text-green-600 bg-green-50';
+            } else if (deviation < 0.3) {
+                deviationLevel = '小偏离';
+                levelColor = 'text-blue-600 bg-blue-50';
+            } else if (deviation < 0.5) {
+                deviationLevel = '中等偏离';
+                levelColor = 'text-yellow-600 bg-yellow-50';
+            } else if (deviation < 1.0) {
+                deviationLevel = '较大偏离';
+                levelColor = 'text-orange-600 bg-orange-50';
+            } else {
+                deviationLevel = '严重偏离';
+                levelColor = 'text-red-600 bg-red-50';
+            }
+            
+            resultDiv.innerHTML = `
+                <div class="space-y-4">
+                    <!-- 主要结果 -->
+                    <div class="text-center">
+                        <div class="text-4xl font-bold result-highlight animate-float mb-2">
+                            ${deviation.toFixed(4)}
+                        </div>
+                        <div class="text-lg text-gray-600">目标市场偏离度</div>
+                        <div class="mt-2">
+                            <span class="inline-block px-3 py-1 rounded-full text-sm font-medium ${levelColor}">
+                                ${deviationLevel}
+                            </span>
+                        </div>
+                    </div>
+                    
+                    <!-- 详细计算 -->
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <h5 class="font-semibold text-gray-800 mb-3">计算详情</h5>
+                        <div class="space-y-2 text-sm">
+                            <div class="flex justify-between">
+                                <span>目标扭矩:</span>
+                                <span class="font-mono">${targetTorque.toFixed(2)}</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>产品扭矩:</span>
+                                <span class="font-mono">${torqueInput.toFixed(2)}</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>扭矩差值:</span>
+                                <span class="font-mono">${torqueDiff.toFixed(2)}</span>
+                            </div>
+                            <hr class="my-2">
+                            <div class="flex justify-between">
+                                <span>目标电阻:</span>
+                                <span class="font-mono">${targetResistance.toFixed(2)}</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>产品电阻:</span>
+                                <span class="font-mono">${resistanceInput.toFixed(2)}</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>电阻差值:</span>
+                                <span class="font-mono">${resistanceDiff.toFixed(2)}</span>
+                            </div>
+                            <hr class="my-2">
+                            <div class="flex justify-between font-semibold">
+                                <span>欧几里得距离:</span>
+                                <span class="font-mono">√(${torqueDiff.toFixed(2)}² + ${resistanceDiff.toFixed(2)}²) = ${deviation.toFixed(4)}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // 更新图表
+        function updateChart() {
+            const ctx = document.getElementById('trendChart').getContext('2d');
+            
+            if (!selectedMarket || !selectedProduct) {
+                if (chart) {
+                    chart.destroy();
+                    chart = null;
+                }
+                return;
+            }
+            
+            const data = marketData[selectedMarket][selectedProduct];
+            const quarters = ['Q1', 'Q2', 'Q3', 'Q4', 'Q5', 'Q6'];
+            const torqueData = quarters.map(q => data.torque[q]);
+            const resistanceData = quarters.map(q => data.resistance[q]);
+            
+            if (chart) {
+                chart.destroy();
+            }
+            
+            chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: quarters,
+                    datasets: [{
+                        label: '扭矩 (Torque)',
+                        data: torqueData,
+                        borderColor: 'rgb(59, 130, 246)',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        tension: 0.3
+                    }, {
+                        label: '电阻 (Resistance)',
+                        data: resistanceData,
+                        borderColor: 'rgb(147, 51, 234)',
+                        backgroundColor: 'rgba(147, 51, 234, 0.1)',
+                        tension: 0.3
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.1)'
+                            }
+                        },
+                        x: {
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.1)'
+                            }
+                        }
+                    },
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: `${marketNames[selectedMarket]} - ${productNames[selectedProduct]} 趋势`
+                        },
+                        legend: {
+                            position: 'top'
+                        }
+                    }
+                }
+            });
+        }
+
+        // 监听轮次变化
+        document.getElementById('quarterSelect').addEventListener('change', function() {
+            updateIdealValues();
+            calculateDeviation();
+        });
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            updateIdealValues();
+        });
+    </script>
+</body>
+</html>
