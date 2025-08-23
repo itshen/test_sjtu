@@ -271,8 +271,6 @@
             }
         };
 
-
-
         // 全局变量
         let selectedQuarter = 'Q5';
         let charts = {};
@@ -336,8 +334,6 @@
             if (deviation < 1.0) return {level: '较大偏离', class: 'deviation-medium', color: 'text-orange-600'};
             return {level: '严重偏离', class: 'deviation-high', color: 'text-red-600'};
         }
-
-
 
         // 计算所有结果
         function calculateAll() {
