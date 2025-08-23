@@ -23,9 +23,7 @@
         .deviation-low { background: linear-gradient(45deg, #10b981, #34d399); }
         .deviation-medium { background: linear-gradient(45deg, #f59e0b, #fbbf24); }
         .deviation-high { background: linear-gradient(45deg, #ef4444, #f87171); }
-        .cost-recommendation {
-            background: linear-gradient(135deg, #8b5cf6 0%, #a78bfa 100%);
-        }
+
     </style>
 </head>
 <body class="bg-gray-50 min-h-screen">
@@ -182,20 +180,6 @@
                     </div>
                 </div>
 
-                <!-- 研发费用建议 -->
-                <div class="bg-white rounded-lg card-shadow p-6">
-                    <h2 class="text-2xl font-semibold text-gray-800 mb-6 flex items-center">
-                        <svg class="w-6 h-6 mr-2 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
-                        </svg>
-                        研发费用建议
-                    </h2>
-                    
-                    <div id="costRecommendation" class="space-y-4">
-                        <!-- 研发费用建议将通过JavaScript生成 -->
-                    </div>
-                </div>
-
                 <!-- 市场位置图表 -->
                 <div class="bg-white rounded-lg card-shadow p-6">
                     <h2 class="text-2xl font-semibold text-gray-800 mb-6 flex items-center">
@@ -287,26 +271,7 @@
             }
         };
 
-        // 研发费用数据
-        const rdCostData = {
-            torque: {
-                // 扭矩变化 -> [最小成功预算, 成功率, 风险等级]
-                0.1: [0.5, 0.8, "低风险"],
-                0.7: [1.1, 0.67, "中等风险"],
-                1.0: [1.5, 0.0, "高风险"],
-                1.4: [1.38, 1.0, "低风险"],
-                4.0: [6.0, 0.5, "中等风险"]
-            },
-            resistance: {
-                // 电阻变化 -> [最小成功预算, 成功率, 风险等级]
-                0.1: [0.5, 0.8, "低风险"],
-                0.4: [0.5, 0.0, "极高风险"],
-                0.8: [1.0, 0.0, "极高风险"],
-                0.9: [1.1, 1.0, "低风险"],
-                1.0: [1.38, 1.0, "低风险"],
-                4.0: [6.0, 0.5, "中等风险"]
-            }
-        };
+
 
         // 全局变量
         let selectedQuarter = 'Q5';
@@ -372,42 +337,7 @@
             return {level: '严重偏离', class: 'deviation-high', color: 'text-red-600'};
         }
 
-        // 计算研发费用
-        function calculateRDCost(currentValue, targetValue, type) {
-            const change = Math.abs(currentValue - targetValue);
-            const data = rdCostData[type];
-            
-            // 找到最接近的变化量
-            let bestMatch = null;
-            let minDiff = Infinity;
-            
-            for (let changeLevel in data) {
-                const diff = Math.abs(parseFloat(changeLevel) - change);
-                if (diff < minDiff) {
-                    minDiff = diff;
-                    bestMatch = changeLevel;
-                }
-            }
-            
-            if (bestMatch) {
-                const [minCost, successRate, riskLevel] = data[bestMatch];
-                return {
-                    change: change,
-                    estimatedCost: minCost * (change / parseFloat(bestMatch)),
-                    successRate: successRate,
-                    riskLevel: riskLevel,
-                    baseChange: parseFloat(bestMatch)
-                };
-            }
-            
-            return {
-                change: change,
-                estimatedCost: change * 1.0, // 默认每单位1M
-                successRate: 0.5,
-                riskLevel: "未知风险",
-                baseChange: change
-            };
-        }
+
 
         // 计算所有结果
         function calculateAll() {
@@ -437,16 +367,10 @@
                         请输入产品参数进行分析
                     </div>
                 `;
-                document.getElementById('costRecommendation').innerHTML = `
-                    <div class="text-center py-8 text-gray-500">
-                        请输入产品参数查看研发费用建议
-                    </div>
-                `;
                 return;
             }
 
             updateMarketAnalysis(inputs);
-            updateCostRecommendation(inputs);
             updateCharts(inputs);
         }
 
@@ -508,87 +432,7 @@
             document.getElementById('marketAnalysis').innerHTML = html;
         }
 
-        // 更新研发费用建议
-        function updateCostRecommendation(inputs) {
-            let html = '';
-            let totalCost = 0;
-            let productAnalysis = [];
 
-            ['rehm1', 'rehm2', 'rehm3'].forEach((product, index) => {
-                if (inputs[product].torque > 0 || inputs[product].resistance > 0) {
-                    // 以尤菲亚为基准计算研发成本
-                    const baseData = marketData.euphoria[product];
-                    const baseTorque = baseData.torque[selectedQuarter];
-                    const baseResistance = baseData.resistance[selectedQuarter];
-                    
-                    const torqueCost = calculateRDCost(inputs[product].torque, baseTorque, 'torque');
-                    const resistanceCost = calculateRDCost(inputs[product].resistance, baseResistance, 'resistance');
-                    
-                    const productCost = torqueCost.estimatedCost + resistanceCost.estimatedCost;
-                    totalCost += productCost;
-                    
-                    const avgSuccessRate = (torqueCost.successRate + resistanceCost.successRate) / 2;
-                    const riskLevel = avgSuccessRate > 0.7 ? '低风险' : avgSuccessRate > 0.3 ? '中等风险' : '高风险';
-                    
-                    productAnalysis.push({
-                        product: `雷墨磁 ${index + 1}`,
-                        cost: productCost,
-                        torqueChange: torqueCost.change,
-                        resistanceChange: resistanceCost.change,
-                        successRate: avgSuccessRate,
-                        riskLevel: riskLevel
-                    });
-                }
-            });
-
-            if (productAnalysis.length > 0) {
-                html += `
-                    <div class="cost-recommendation text-white p-6 rounded-lg mb-4">
-                        <h3 class="text-xl font-semibold mb-4">💰 总研发费用预估</h3>
-                        <div class="text-3xl font-bold mb-2">$${totalCost.toFixed(2)}M</div>
-                        <div class="text-purple-100">基于历史数据的成本估算</div>
-                    </div>
-                `;
-
-                productAnalysis.forEach(analysis => {
-                    const riskColor = analysis.riskLevel === '低风险' ? 'green' : 
-                                     analysis.riskLevel === '中等风险' ? 'yellow' : 'red';
-                    
-                    html += `
-                        <div class="bg-gray-50 p-4 rounded-lg border-l-4 border-${riskColor}-500">
-                            <h4 class="font-semibold text-gray-800 mb-2">${analysis.product}</h4>
-                            <div class="grid grid-cols-2 gap-4 text-sm">
-                                <div>
-                                    <div class="text-gray-600">预估成本:</div>
-                                    <div class="font-bold text-${riskColor}-600">$${analysis.cost.toFixed(2)}M</div>
-                                </div>
-                                <div>
-                                    <div class="text-gray-600">成功率:</div>
-                                    <div class="font-bold">${(analysis.successRate * 100).toFixed(0)}%</div>
-                                </div>
-                                <div>
-                                    <div class="text-gray-600">扭矩变化:</div>
-                                    <div class="font-mono text-xs">${analysis.torqueChange.toFixed(2)}</div>
-                                </div>
-                                <div>
-                                    <div class="text-gray-600">电阻变化:</div>
-                                    <div class="font-mono text-xs">${analysis.resistanceChange.toFixed(2)}</div>
-                                </div>
-                            </div>
-                            <div class="mt-2">
-                                <span class="inline-block px-2 py-1 text-xs rounded bg-${riskColor}-100 text-${riskColor}-600">
-                                    ${analysis.riskLevel}
-                                </span>
-                            </div>
-                        </div>
-                    `;
-                });
-            } else {
-                html = '<div class="text-center py-8 text-gray-500">请输入产品参数查看研发费用建议</div>';
-            }
-
-            document.getElementById('costRecommendation').innerHTML = html;
-        }
 
         // 更新图表
         function updateCharts(inputs) {
