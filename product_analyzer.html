@@ -1,0 +1,810 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>雷墨磁产品分析系统 - 洛小山</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .card-shadow {
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+        .market-card {
+            transition: all 0.3s ease;
+        }
+        .market-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 15px 30px -5px rgba(0, 0, 0, 0.15);
+        }
+        .deviation-low { background: linear-gradient(45deg, #10b981, #34d399); }
+        .deviation-medium { background: linear-gradient(45deg, #f59e0b, #fbbf24); }
+        .deviation-high { background: linear-gradient(45deg, #ef4444, #f87171); }
+        .cost-recommendation {
+            background: linear-gradient(135deg, #8b5cf6 0%, #a78bfa 100%);
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- 头部 -->
+    <header class="gradient-bg text-white shadow-lg">
+        <div class="container mx-auto px-6 py-4">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h1 class="text-3xl font-bold">雷墨磁产品分析系统</h1>
+                    <p class="text-blue-100 mt-1">一站式市场偏离度分析与研发费用优化</p>
+                </div>
+                <div class="text-right">
+                    <p class="text-sm text-blue-200">作者: 洛小山 (Luoxiaoshan)</p>
+                    <p class="text-sm text-blue-200">GitHub: https://github.com/itshen</p>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="container mx-auto px-6 py-8">
+        <!-- 轮次选择 -->
+        <div class="bg-white rounded-lg card-shadow p-6 mb-8">
+            <h2 class="text-2xl font-semibold text-gray-800 mb-4 flex items-center">
+                <svg class="w-6 h-6 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+                </svg>
+                选择分析轮次
+            </h2>
+            <div class="grid grid-cols-6 gap-3">
+                <button onclick="selectQuarter('Q1')" class="quarter-btn p-3 border-2 border-gray-300 rounded-lg text-center hover:border-blue-500 hover:bg-blue-50 transition duration-200" data-quarter="Q1">
+                    <div class="font-semibold">Q1</div>
+                    <div class="text-xs text-gray-500">实际值</div>
+                </button>
+                <button onclick="selectQuarter('Q2')" class="quarter-btn p-3 border-2 border-gray-300 rounded-lg text-center hover:border-blue-500 hover:bg-blue-50 transition duration-200" data-quarter="Q2">
+                    <div class="font-semibold">Q2</div>
+                    <div class="text-xs text-gray-500">实际值</div>
+                </button>
+                <button onclick="selectQuarter('Q3')" class="quarter-btn p-3 border-2 border-gray-300 rounded-lg text-center hover:border-blue-500 hover:bg-blue-50 transition duration-200" data-quarter="Q3">
+                    <div class="font-semibold">Q3</div>
+                    <div class="text-xs text-gray-500">历史值</div>
+                </button>
+                <button onclick="selectQuarter('Q4')" class="quarter-btn p-3 border-2 border-gray-300 rounded-lg text-center hover:border-blue-500 hover:bg-blue-50 transition duration-200" data-quarter="Q4">
+                    <div class="font-semibold">Q4</div>
+                    <div class="text-xs text-gray-500">历史值</div>
+                </button>
+                <button onclick="selectQuarter('Q5')" class="quarter-btn p-3 border-2 border-blue-500 bg-blue-50 rounded-lg text-center hover:border-blue-600 hover:bg-blue-100 transition duration-200" data-quarter="Q5">
+                    <div class="font-semibold text-blue-600">Q5</div>
+                    <div class="text-xs text-blue-500">预测值</div>
+                </button>
+                <button onclick="selectQuarter('Q6')" class="quarter-btn p-3 border-2 border-gray-300 rounded-lg text-center hover:border-blue-500 hover:bg-blue-50 transition duration-200" data-quarter="Q6">
+                    <div class="font-semibold">Q6</div>
+                    <div class="text-xs text-gray-500">预测值</div>
+                </button>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- 左侧：产品参数输入 -->
+            <div class="lg:col-span-1">
+                <div class="bg-white rounded-lg card-shadow p-6">
+                    <h2 class="text-2xl font-semibold text-gray-800 mb-6 flex items-center">
+                        <svg class="w-6 h-6 mr-2 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+                        </svg>
+                        产品参数输入
+                    </h2>
+                    
+                    <!-- 雷墨磁1 -->
+                    <div class="mb-6 p-4 bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg border-l-4 border-purple-500">
+                        <h3 class="font-semibold text-gray-800 mb-3 flex items-center">
+                            <span class="w-6 h-6 bg-purple-500 text-white rounded-full flex items-center justify-center text-xs mr-2">1</span>
+                            雷墨磁 1
+                        </h3>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">扭矩</label>
+                                <input type="number" id="rehm1_torque" step="0.01" min="0" max="10" 
+                                       class="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                       placeholder="4.36" oninput="calculateAll()" onchange="calculateAll()" onkeyup="calculateAll()">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">电阻</label>
+                                <input type="number" id="rehm1_resistance" step="0.01" min="0" max="10" 
+                                       class="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                       placeholder="3.77" oninput="calculateAll()" onchange="calculateAll()" onkeyup="calculateAll()">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 雷墨磁2 -->
+                    <div class="mb-6 p-4 bg-gradient-to-r from-blue-50 to-cyan-50 rounded-lg border-l-4 border-blue-500">
+                        <h3 class="font-semibold text-gray-800 mb-3 flex items-center">
+                            <span class="w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs mr-2">2</span>
+                            雷墨磁 2
+                        </h3>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">扭矩</label>
+                                <input type="number" id="rehm2_torque" step="0.01" min="0" max="10" 
+                                       class="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                       placeholder="2.46" oninput="calculateAll()" onchange="calculateAll()" onkeyup="calculateAll()">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">电阻</label>
+                                <input type="number" id="rehm2_resistance" step="0.01" min="0" max="10" 
+                                       class="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                       placeholder="2.32" oninput="calculateAll()" onchange="calculateAll()" onkeyup="calculateAll()">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 雷墨磁3 -->
+                    <div class="mb-6 p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border-l-4 border-green-500">
+                        <h3 class="font-semibold text-gray-800 mb-3 flex items-center">
+                            <span class="w-6 h-6 bg-green-500 text-white rounded-full flex items-center justify-center text-xs mr-2">3</span>
+                            雷墨磁 3
+                        </h3>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">扭矩</label>
+                                <input type="number" id="rehm3_torque" step="0.01" min="0" max="10" 
+                                       class="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                                       placeholder="1.85" oninput="calculateAll()" onchange="calculateAll()" onkeyup="calculateAll()">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">电阻</label>
+                                <input type="number" id="rehm3_resistance" step="0.01" min="0" max="10" 
+                                       class="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                                       placeholder="3.50" oninput="calculateAll()" onchange="calculateAll()" onkeyup="calculateAll()">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 一键填入当前理想值 -->
+                    <button onclick="fillIdealValues()" class="w-full bg-gradient-to-r from-indigo-500 to-purple-600 text-white py-3 px-6 rounded-lg font-semibold hover:from-indigo-600 hover:to-purple-700 transform hover:scale-105 transition duration-200 shadow-lg">
+                        📋 填入当前轮次理想值
+                    </button>
+                </div>
+            </div>
+
+            <!-- 右侧：分析结果 -->
+            <div class="lg:col-span-2 space-y-6">
+                <!-- 市场偏离度分析 -->
+                <div class="bg-white rounded-lg card-shadow p-6">
+                    <h2 class="text-2xl font-semibold text-gray-800 mb-6 flex items-center">
+                        <svg class="w-6 h-6 mr-2 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v4"></path>
+                        </svg>
+                        市场偏离度分析
+                    </h2>
+                    
+                    <div id="marketAnalysis" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <!-- 市场分析卡片将通过JavaScript生成 -->
+                    </div>
+                </div>
+
+                <!-- 研发费用建议 -->
+                <div class="bg-white rounded-lg card-shadow p-6">
+                    <h2 class="text-2xl font-semibold text-gray-800 mb-6 flex items-center">
+                        <svg class="w-6 h-6 mr-2 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
+                        </svg>
+                        研发费用建议
+                    </h2>
+                    
+                    <div id="costRecommendation" class="space-y-4">
+                        <!-- 研发费用建议将通过JavaScript生成 -->
+                    </div>
+                </div>
+
+                <!-- 市场位置图表 -->
+                <div class="bg-white rounded-lg card-shadow p-6">
+                    <h2 class="text-2xl font-semibold text-gray-800 mb-6 flex items-center">
+                        <svg class="w-6 h-6 mr-2 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"></path>
+                        </svg>
+                        市场位置对比图
+                    </h2>
+                    
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <h4 class="font-semibold text-center mb-2">雷墨磁 1</h4>
+                            <div class="relative h-64">
+                                <canvas id="chart1" width="200" height="200"></canvas>
+                            </div>
+                        </div>
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <h4 class="font-semibold text-center mb-2">雷墨磁 2</h4>
+                            <div class="relative h-64">
+                                <canvas id="chart2" width="200" height="200"></canvas>
+                            </div>
+                        </div>
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <h4 class="font-semibold text-center mb-2">雷墨磁 3</h4>
+                            <div class="relative h-64">
+                                <canvas id="chart3" width="200" height="200"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 底部信息 -->
+    <footer class="bg-gray-800 text-white py-6 mt-12">
+        <div class="container mx-auto px-6 text-center">
+            <p class="text-gray-300">
+                基于欧几里得距离公式: <span class="font-mono bg-gray-700 px-2 py-1 rounded">√[(扭矩差)² + (电阻差)²]</span>
+            </p>
+            <p class="text-gray-400 mt-2">© 2024 洛小山 (Luoxiaoshan) - 雷墨磁产品分析系统</p>
+        </div>
+    </footer>
+
+    <script>
+        // 市场数据
+        const marketData = {
+            "euphoria": {
+                "rehm1": {
+                    "torque": {"Q1": 4.36, "Q2": 4.24, "Q3": 3.6, "Q4": 3.2, "Q5": 2.82, "Q6": 2.41},
+                    "resistance": {"Q1": 3.77, "Q2": 3.75, "Q3": 3.7, "Q4": 3.6, "Q5": 3.57, "Q6": 3.51}
+                },
+                "rehm2": {
+                    "torque": {"Q1": 2.46, "Q2": 2.61, "Q3": 2.6, "Q4": 2.7, "Q5": 2.77, "Q6": 2.84},
+                    "resistance": {"Q1": 2.32, "Q2": 2.51, "Q3": 2.5, "Q4": 2.6, "Q5": 2.69, "Q6": 2.77}
+                },
+                "rehm3": {
+                    "torque": {"Q1": 1.85, "Q2": 2.20, "Q3": 2.6, "Q4": 2.9, "Q5": 3.27, "Q6": 3.63},
+                    "resistance": {"Q1": 3.50, "Q2": 3.51, "Q3": 3.5, "Q4": 3.5, "Q5": 3.50, "Q6": 3.50}
+                }
+            },
+            "ledakka": {
+                "rehm1": {
+                    "torque": {"Q1": 4.03, "Q2": 3.84, "Q3": 3.6, "Q4": 3.4, "Q5": 3.18, "Q6": 2.97},
+                    "resistance": {"Q1": 4.29, "Q2": 4.26, "Q3": 4.2, "Q4": 4.1, "Q5": 4.06, "Q6": 3.99}
+                },
+                "rehm2": {
+                    "torque": {"Q1": 2.57, "Q2": 2.51, "Q3": 2.5, "Q4": 2.5, "Q5": 2.47, "Q6": 2.44},
+                    "resistance": {"Q1": 2.55, "Q2": 2.60, "Q3": 2.7, "Q4": 2.7, "Q5": 2.78, "Q6": 2.83}
+                },
+                "rehm3": {
+                    "torque": {"Q1": 1.10, "Q2": 1.20, "Q3": 1.3, "Q4": 1.4, "Q5": 1.50, "Q6": 1.60},
+                    "resistance": {"Q1": 1.49, "Q2": 1.50, "Q3": 1.5, "Q4": 1.5, "Q5": 1.50, "Q6": 1.51}
+                }
+            },
+            "nihono": {
+                "rehm1": {
+                    "torque": {"Q1": 4.07, "Q2": 4.20, "Q3": 4.3, "Q4": 4.5, "Q5": 4.62, "Q6": 4.75},
+                    "resistance": {"Q1": 2.20, "Q2": 2.35, "Q3": 2.5, "Q4": 2.7, "Q5": 2.85, "Q6": 3.02}
+                },
+                "rehm2": {
+                    "torque": {"Q1": 3.52, "Q2": 3.73, "Q3": 3.8, "Q4": 4.2, "Q5": 4.34, "Q6": 4.55},
+                    "resistance": {"Q1": 2.58, "Q2": 2.71, "Q3": 2.8, "Q4": 2.9, "Q5": 3.01, "Q6": 3.11}
+                },
+                "rehm3": {
+                    "torque": {"Q1": 4.40, "Q2": 4.15, "Q3": 3.9, "Q4": 3.7, "Q5": 3.45, "Q6": 3.21},
+                    "resistance": {"Q1": 1.47, "Q2": 1.54, "Q3": 1.6, "Q4": 1.7, "Q5": 1.77, "Q6": 1.84}
+                }
+            }
+        };
+
+        // 研发费用数据
+        const rdCostData = {
+            torque: {
+                // 扭矩变化 -> [最小成功预算, 成功率, 风险等级]
+                0.1: [0.5, 0.8, "低风险"],
+                0.7: [1.1, 0.67, "中等风险"],
+                1.0: [1.5, 0.0, "高风险"],
+                1.4: [1.38, 1.0, "低风险"],
+                4.0: [6.0, 0.5, "中等风险"]
+            },
+            resistance: {
+                // 电阻变化 -> [最小成功预算, 成功率, 风险等级]
+                0.1: [0.5, 0.8, "低风险"],
+                0.4: [0.5, 0.0, "极高风险"],
+                0.8: [1.0, 0.0, "极高风险"],
+                0.9: [1.1, 1.0, "低风险"],
+                1.0: [1.38, 1.0, "低风险"],
+                4.0: [6.0, 0.5, "中等风险"]
+            }
+        };
+
+        // 全局变量
+        let selectedQuarter = 'Q5';
+        let charts = {};
+
+        // 市场名称映射
+        const marketNames = {
+            'euphoria': '尤菲亚',
+            'ledakka': '纳达卡',
+            'nihono': '尼赫鲁'
+        };
+
+        const marketColors = {
+            'euphoria': {bg: 'bg-purple-50', border: 'border-purple-500', text: 'text-purple-600'},
+            'ledakka': {bg: 'bg-green-50', border: 'border-green-500', text: 'text-green-600'},
+            'nihono': {bg: 'bg-blue-50', border: 'border-blue-500', text: 'text-blue-600'}
+        };
+
+        // 选择轮次
+        function selectQuarter(quarter) {
+            selectedQuarter = quarter;
+            
+            // 更新UI状态
+            document.querySelectorAll('.quarter-btn').forEach(btn => {
+                btn.classList.remove('border-blue-500', 'bg-blue-50');
+                btn.classList.add('border-gray-300');
+            });
+            
+            document.querySelector(`[data-quarter="${quarter}"]`).classList.add('border-blue-500', 'bg-blue-50');
+            document.querySelector(`[data-quarter="${quarter}"]`).classList.remove('border-gray-300');
+            
+            fillIdealValues();
+            calculateAll();
+        }
+
+        // 填入理想值
+        function fillIdealValues() {
+            if (!selectedQuarter) return;
+            
+            const data = marketData.euphoria; // 默认使用尤菲亚的值作为参考
+            
+            document.getElementById('rehm1_torque').value = data.rehm1.torque[selectedQuarter].toFixed(2);
+            document.getElementById('rehm1_resistance').value = data.rehm1.resistance[selectedQuarter].toFixed(2);
+            document.getElementById('rehm2_torque').value = data.rehm2.torque[selectedQuarter].toFixed(2);
+            document.getElementById('rehm2_resistance').value = data.rehm2.resistance[selectedQuarter].toFixed(2);
+            document.getElementById('rehm3_torque').value = data.rehm3.torque[selectedQuarter].toFixed(2);
+            document.getElementById('rehm3_resistance').value = data.rehm3.resistance[selectedQuarter].toFixed(2);
+            
+            calculateAll();
+        }
+
+        // 计算欧几里得距离
+        function calculateEuclideanDistance(x1, y1, x2, y2) {
+            return Math.sqrt(Math.pow(x1 - x2, 2) + Math.pow(y1 - y2, 2));
+        }
+
+        // 获取偏离度等级
+        function getDeviationLevel(deviation) {
+            if (deviation < 0.1) return {level: '极小偏离', class: 'deviation-low', color: 'text-green-600'};
+            if (deviation < 0.3) return {level: '小偏离', class: 'deviation-low', color: 'text-green-600'};
+            if (deviation < 0.5) return {level: '中等偏离', class: 'deviation-medium', color: 'text-yellow-600'};
+            if (deviation < 1.0) return {level: '较大偏离', class: 'deviation-medium', color: 'text-orange-600'};
+            return {level: '严重偏离', class: 'deviation-high', color: 'text-red-600'};
+        }
+
+        // 计算研发费用
+        function calculateRDCost(currentValue, targetValue, type) {
+            const change = Math.abs(currentValue - targetValue);
+            const data = rdCostData[type];
+            
+            // 找到最接近的变化量
+            let bestMatch = null;
+            let minDiff = Infinity;
+            
+            for (let changeLevel in data) {
+                const diff = Math.abs(parseFloat(changeLevel) - change);
+                if (diff < minDiff) {
+                    minDiff = diff;
+                    bestMatch = changeLevel;
+                }
+            }
+            
+            if (bestMatch) {
+                const [minCost, successRate, riskLevel] = data[bestMatch];
+                return {
+                    change: change,
+                    estimatedCost: minCost * (change / parseFloat(bestMatch)),
+                    successRate: successRate,
+                    riskLevel: riskLevel,
+                    baseChange: parseFloat(bestMatch)
+                };
+            }
+            
+            return {
+                change: change,
+                estimatedCost: change * 1.0, // 默认每单位1M
+                successRate: 0.5,
+                riskLevel: "未知风险",
+                baseChange: change
+            };
+        }
+
+        // 计算所有结果
+        function calculateAll() {
+            const inputs = {
+                rehm1: {
+                    torque: parseFloat(document.getElementById('rehm1_torque').value) || 0,
+                    resistance: parseFloat(document.getElementById('rehm1_resistance').value) || 0
+                },
+                rehm2: {
+                    torque: parseFloat(document.getElementById('rehm2_torque').value) || 0,
+                    resistance: parseFloat(document.getElementById('rehm2_resistance').value) || 0
+                },
+                rehm3: {
+                    torque: parseFloat(document.getElementById('rehm3_torque').value) || 0,
+                    resistance: parseFloat(document.getElementById('rehm3_resistance').value) || 0
+                }
+            };
+
+            // 检查输入是否有效
+            const hasValidInput = Object.values(inputs).some(product => 
+                product.torque > 0 || product.resistance > 0
+            );
+
+            if (!hasValidInput) {
+                document.getElementById('marketAnalysis').innerHTML = `
+                    <div class="col-span-3 text-center py-8 text-gray-500">
+                        请输入产品参数进行分析
+                    </div>
+                `;
+                document.getElementById('costRecommendation').innerHTML = `
+                    <div class="text-center py-8 text-gray-500">
+                        请输入产品参数查看研发费用建议
+                    </div>
+                `;
+                return;
+            }
+
+            updateMarketAnalysis(inputs);
+            updateCostRecommendation(inputs);
+            updateCharts(inputs);
+        }
+
+        // 更新市场分析
+        function updateMarketAnalysis(inputs) {
+            let html = '';
+            
+            Object.keys(marketData).forEach(market => {
+                const marketInfo = marketData[market];
+                let totalDeviation = 0;
+                let validCount = 0;
+                let productResults = [];
+
+                ['rehm1', 'rehm2', 'rehm3'].forEach(product => {
+                    if (inputs[product].torque > 0 || inputs[product].resistance > 0) {
+                        const targetTorque = marketInfo[product].torque[selectedQuarter];
+                        const targetResistance = marketInfo[product].resistance[selectedQuarter];
+                        const deviation = calculateEuclideanDistance(
+                            inputs[product].torque, inputs[product].resistance,
+                            targetTorque, targetResistance
+                        );
+                        
+                        totalDeviation += deviation;
+                        validCount++;
+                        productResults.push({product, deviation});
+                    }
+                });
+
+                if (validCount > 0) {
+                    const avgDeviation = totalDeviation / validCount;
+                    const deviationInfo = getDeviationLevel(avgDeviation);
+                    const colors = marketColors[market];
+
+                    html += `
+                        <div class="market-card ${colors.bg} border-l-4 ${colors.border} p-4 rounded-lg">
+                            <h3 class="font-semibold ${colors.text} mb-3 flex items-center">
+                                ${marketNames[market]}
+                                <span class="ml-2 text-xs ${deviationInfo.color} bg-white px-2 py-1 rounded">${deviationInfo.level}</span>
+                            </h3>
+                            <div class="space-y-2">
+                                <div class="text-2xl font-bold ${deviationInfo.color}">
+                                    ${avgDeviation.toFixed(4)}
+                                </div>
+                                <div class="text-sm text-gray-600">平均偏离度</div>
+                                <div class="space-y-1 text-xs">
+                                    ${productResults.map(r => `
+                                        <div class="flex justify-between">
+                                            <span>${r.product.toUpperCase()}:</span>
+                                            <span class="font-mono">${r.deviation.toFixed(3)}</span>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+            });
+
+            document.getElementById('marketAnalysis').innerHTML = html;
+        }
+
+        // 更新研发费用建议
+        function updateCostRecommendation(inputs) {
+            let html = '';
+            let totalCost = 0;
+            let productAnalysis = [];
+
+            ['rehm1', 'rehm2', 'rehm3'].forEach((product, index) => {
+                if (inputs[product].torque > 0 || inputs[product].resistance > 0) {
+                    // 以尤菲亚为基准计算研发成本
+                    const baseData = marketData.euphoria[product];
+                    const baseTorque = baseData.torque[selectedQuarter];
+                    const baseResistance = baseData.resistance[selectedQuarter];
+                    
+                    const torqueCost = calculateRDCost(inputs[product].torque, baseTorque, 'torque');
+                    const resistanceCost = calculateRDCost(inputs[product].resistance, baseResistance, 'resistance');
+                    
+                    const productCost = torqueCost.estimatedCost + resistanceCost.estimatedCost;
+                    totalCost += productCost;
+                    
+                    const avgSuccessRate = (torqueCost.successRate + resistanceCost.successRate) / 2;
+                    const riskLevel = avgSuccessRate > 0.7 ? '低风险' : avgSuccessRate > 0.3 ? '中等风险' : '高风险';
+                    
+                    productAnalysis.push({
+                        product: `雷墨磁 ${index + 1}`,
+                        cost: productCost,
+                        torqueChange: torqueCost.change,
+                        resistanceChange: resistanceCost.change,
+                        successRate: avgSuccessRate,
+                        riskLevel: riskLevel
+                    });
+                }
+            });
+
+            if (productAnalysis.length > 0) {
+                html += `
+                    <div class="cost-recommendation text-white p-6 rounded-lg mb-4">
+                        <h3 class="text-xl font-semibold mb-4">💰 总研发费用预估</h3>
+                        <div class="text-3xl font-bold mb-2">$${totalCost.toFixed(2)}M</div>
+                        <div class="text-purple-100">基于历史数据的成本估算</div>
+                    </div>
+                `;
+
+                productAnalysis.forEach(analysis => {
+                    const riskColor = analysis.riskLevel === '低风险' ? 'green' : 
+                                     analysis.riskLevel === '中等风险' ? 'yellow' : 'red';
+                    
+                    html += `
+                        <div class="bg-gray-50 p-4 rounded-lg border-l-4 border-${riskColor}-500">
+                            <h4 class="font-semibold text-gray-800 mb-2">${analysis.product}</h4>
+                            <div class="grid grid-cols-2 gap-4 text-sm">
+                                <div>
+                                    <div class="text-gray-600">预估成本:</div>
+                                    <div class="font-bold text-${riskColor}-600">$${analysis.cost.toFixed(2)}M</div>
+                                </div>
+                                <div>
+                                    <div class="text-gray-600">成功率:</div>
+                                    <div class="font-bold">${(analysis.successRate * 100).toFixed(0)}%</div>
+                                </div>
+                                <div>
+                                    <div class="text-gray-600">扭矩变化:</div>
+                                    <div class="font-mono text-xs">${analysis.torqueChange.toFixed(2)}</div>
+                                </div>
+                                <div>
+                                    <div class="text-gray-600">电阻变化:</div>
+                                    <div class="font-mono text-xs">${analysis.resistanceChange.toFixed(2)}</div>
+                                </div>
+                            </div>
+                            <div class="mt-2">
+                                <span class="inline-block px-2 py-1 text-xs rounded bg-${riskColor}-100 text-${riskColor}-600">
+                                    ${analysis.riskLevel}
+                                </span>
+                            </div>
+                        </div>
+                    `;
+                });
+            } else {
+                html = '<div class="text-center py-8 text-gray-500">请输入产品参数查看研发费用建议</div>';
+            }
+
+            document.getElementById('costRecommendation').innerHTML = html;
+        }
+
+        // 更新图表
+        function updateCharts(inputs) {
+            ['rehm1', 'rehm2', 'rehm3'].forEach((product, index) => {
+                const chartId = `chart${index + 1}`;
+                const ctx = document.getElementById(chartId).getContext('2d');
+                
+                if (charts[chartId]) {
+                    charts[chartId].destroy();
+                }
+
+                const datasets = [];
+                const colors = ['#8b5cf6', '#10b981', '#3b82f6']; // 紫色、绿色、蓝色
+                let colorIndex = 0;
+                
+                // 收集所有数据点以计算坐标轴范围
+                let allTorques = [];
+                let allResistances = [];
+
+                // 添加市场理想值
+                Object.keys(marketData).forEach(market => {
+                    const marketInfo = marketData[market];
+                    const targetTorque = marketInfo[product].torque[selectedQuarter];
+                    const targetResistance = marketInfo[product].resistance[selectedQuarter];
+                    
+                    allTorques.push(targetTorque);
+                    allResistances.push(targetResistance);
+                    
+                    datasets.push({
+                        label: marketNames[market],
+                        data: [{x: targetTorque, y: targetResistance}],
+                        backgroundColor: colors[colorIndex],
+                        borderColor: colors[colorIndex],
+                        pointRadius: 8,
+                        pointHoverRadius: 10
+                    });
+                    colorIndex++;
+                });
+
+                // 添加我们的产品位置（只有在有效输入时）
+                if (inputs[product].torque > 0 && inputs[product].resistance > 0) {
+                    allTorques.push(inputs[product].torque);
+                    allResistances.push(inputs[product].resistance);
+                    
+                    datasets.push({
+                        label: '我们的产品',
+                        data: [{x: inputs[product].torque, y: inputs[product].resistance}],
+                        backgroundColor: '#ef4444',
+                        borderColor: '#ef4444',
+                        pointRadius: 12,
+                        pointHoverRadius: 14,
+                        pointStyle: 'star'
+                    });
+                }
+                
+                // 计算动态坐标轴范围
+                const minTorque = Math.min(...allTorques);
+                const maxTorque = Math.max(...allTorques);
+                const minResistance = Math.min(...allResistances);
+                const maxResistance = Math.max(...allResistances);
+                
+                // 添加一些边距
+                const torqueRange = maxTorque - minTorque;
+                const resistanceRange = maxResistance - minResistance;
+                const torqueMargin = Math.max(torqueRange * 0.2, 0.5);
+                const resistanceMargin = Math.max(resistanceRange * 0.2, 0.5);
+
+                charts[chartId] = new Chart(ctx, {
+                    type: 'scatter',
+                    data: { datasets: datasets },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            x: {
+                                title: { 
+                                    display: true, 
+                                    text: '扭矩 (Torque)',
+                                    font: { size: 12 }
+                                },
+                                min: Math.max(0, minTorque - torqueMargin),
+                                max: maxTorque + torqueMargin,
+                                grid: {
+                                    color: 'rgba(0, 0, 0, 0.1)'
+                                }
+                            },
+                            y: {
+                                title: { 
+                                    display: true, 
+                                    text: '电阻 (Resistance)',
+                                    font: { size: 12 }
+                                },
+                                min: Math.max(0, minResistance - resistanceMargin),
+                                max: maxResistance + resistanceMargin,
+                                grid: {
+                                    color: 'rgba(0, 0, 0, 0.1)'
+                                }
+                            }
+                        },
+                        plugins: {
+                            legend: { 
+                                position: 'bottom',
+                                labels: {
+                                    usePointStyle: true,
+                                    padding: 10,
+                                    font: { size: 10 }
+                                }
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        const deviation = inputs[product].torque > 0 && inputs[product].resistance > 0 && context.dataset.label !== '我们的产品' ?
+                                            calculateEuclideanDistance(
+                                                inputs[product].torque, inputs[product].resistance,
+                                                context.parsed.x, context.parsed.y
+                                            ).toFixed(3) : '';
+                                        
+                                        return `${context.dataset.label}: (${context.parsed.x.toFixed(2)}, ${context.parsed.y.toFixed(2)})${deviation ? ` | 偏离度: ${deviation}` : ''}`;
+                                    }
+                                }
+                            }
+                        },
+                        animation: {
+                            duration: 300
+                        }
+                    }
+                });
+            });
+        }
+
+        // 初始化图表
+        function initializeCharts() {
+            ['rehm1', 'rehm2', 'rehm3'].forEach((product, index) => {
+                const chartId = `chart${index + 1}`;
+                const ctx = document.getElementById(chartId).getContext('2d');
+                
+                const datasets = [];
+                const colors = ['#8b5cf6', '#10b981', '#3b82f6'];
+                let colorIndex = 0;
+
+                // 只显示市场理想值
+                Object.keys(marketData).forEach(market => {
+                    const marketInfo = marketData[market];
+                    const targetTorque = marketInfo[product].torque[selectedQuarter];
+                    const targetResistance = marketInfo[product].resistance[selectedQuarter];
+                    
+                    datasets.push({
+                        label: marketNames[market],
+                        data: [{x: targetTorque, y: targetResistance}],
+                        backgroundColor: colors[colorIndex],
+                        borderColor: colors[colorIndex],
+                        pointRadius: 8,
+                        pointHoverRadius: 10
+                    });
+                    colorIndex++;
+                });
+
+                charts[chartId] = new Chart(ctx, {
+                    type: 'scatter',
+                    data: { datasets: datasets },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            x: {
+                                title: { 
+                                    display: true, 
+                                    text: '扭矩 (Torque)',
+                                    font: { size: 12 }
+                                },
+                                min: 0,
+                                max: 5,
+                                grid: {
+                                    color: 'rgba(0, 0, 0, 0.1)'
+                                }
+                            },
+                            y: {
+                                title: { 
+                                    display: true, 
+                                    text: '电阻 (Resistance)',
+                                    font: { size: 12 }
+                                },
+                                min: 0,
+                                max: 5,
+                                grid: {
+                                    color: 'rgba(0, 0, 0, 0.1)'
+                                }
+                            }
+                        },
+                        plugins: {
+                            legend: { 
+                                position: 'bottom',
+                                labels: {
+                                    usePointStyle: true,
+                                    padding: 10,
+                                    font: { size: 10 }
+                                }
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        return `${context.dataset.label}: (${context.parsed.x.toFixed(2)}, ${context.parsed.y.toFixed(2)})`;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            });
+        }
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            selectQuarter('Q5'); // 默认选择Q5
+            initializeCharts(); // 初始化图表
+        });
+    </script>
+</body>
+</html>
