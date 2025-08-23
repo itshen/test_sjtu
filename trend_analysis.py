@@ -8,22 +8,22 @@
 import json
 import math
 
-# 历史数据
+# 历史数据 (更新Q1、Q2实际值)
 historical_data = {
     'euphoria': {
-        'rehm1': {'torque': [4.2, 3.9, 3.6, 3.2], 'resistance': [3.9, 3.9, 3.7, 3.6]},
-        'rehm2': {'torque': [2.5, 2.6, 2.6, 2.7], 'resistance': [2.4, 2.5, 2.5, 2.6]},
-        'rehm3': {'torque': [1.9, 2.2, 2.6, 2.9], 'resistance': [3.5, 3.5, 3.5, 3.5]}
+        'rehm1': {'torque': [4.36, 4.24, 3.6, 3.2], 'resistance': [3.77, 3.75, 3.7, 3.6]},
+        'rehm2': {'torque': [2.46, 2.61, 2.6, 2.7], 'resistance': [2.32, 2.51, 2.5, 2.6]},
+        'rehm3': {'torque': [1.85, 2.20, 2.6, 2.9], 'resistance': [3.50, 3.51, 3.5, 3.5]}
     },
     'ledakka': {
-        'rehm1': {'torque': [4.0, 3.8, 3.6, 3.4], 'resistance': [4.3, 4.3, 4.2, 4.1]},
-        'rehm2': {'torque': [2.6, 2.5, 2.5, 2.5], 'resistance': [2.6, 2.6, 2.7, 2.7]},
-        'rehm3': {'torque': [1.1, 1.2, 1.3, 1.4], 'resistance': [1.5, 1.5, 1.5, 1.5]}
+        'rehm1': {'torque': [4.03, 3.84, 3.6, 3.4], 'resistance': [4.29, 4.26, 4.2, 4.1]},
+        'rehm2': {'torque': [2.57, 2.51, 2.5, 2.5], 'resistance': [2.55, 2.60, 2.7, 2.7]},
+        'rehm3': {'torque': [1.10, 1.20, 1.3, 1.4], 'resistance': [1.49, 1.50, 1.5, 1.5]}
     },
     'nihono': {
-        'rehm1': {'torque': [4.0, 4.2, 4.3, 4.5], 'resistance': [2.2, 2.4, 2.5, 2.7]},
-        'rehm2': {'torque': [3.5, 3.7, 3.8, 4.2], 'resistance': [2.7, 2.7, 2.8, 2.9]},
-        'rehm3': {'torque': [4.4, 4.2, 3.9, 3.7], 'resistance': [1.5, 1.5, 1.6, 1.7]}
+        'rehm1': {'torque': [4.07, 4.20, 4.3, 4.5], 'resistance': [2.20, 2.35, 2.5, 2.7]},
+        'rehm2': {'torque': [3.52, 3.73, 3.8, 4.2], 'resistance': [2.58, 2.71, 2.8, 2.9]},
+        'rehm3': {'torque': [4.40, 4.15, 3.9, 3.7], 'resistance': [1.47, 1.54, 1.6, 1.7]}
     }
 }
 
