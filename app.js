@@ -9,23 +9,17 @@ let showComparison = false;
 const periodOrder = ['1A', '1B', '2', '3'];
 
 // 页面加载完成后初始化
-document.addEventListener('DOMContentLoaded', async function() {
-    await loadAllData();
+document.addEventListener('DOMContentLoaded', function() {
+    loadAllData();
     initEventListeners();
     displayData(currentPeriod);
 });
 
 // 加载所有数据
-async function loadAllData() {
+function loadAllData() {
     try {
-        const periods = ['1A', '1B', '2', '3'];
-        for (const period of periods) {
-            const fileName = period === '1A' ? 'round_1a.json' : 
-                           period === '1B' ? 'round_1b.json' : 
-                           `round_${period}.json`;
-            const response = await fetch(`data/${fileName}`);
-            allData[period] = await response.json();
-        }
+        // 直接使用内嵌的数据
+        allData = DATA_STORAGE;
         console.log('所有数据加载完成:', allData);
     } catch (error) {
         console.error('数据加载失败:', error);
@@ -317,8 +311,19 @@ function displayCoordinateCharts(marketIdealValues) {
                         },
                         beginAtZero: true,
                         max: 5,
+                        min: 0,
+                        ticks: {
+                            stepSize: 0.5,
+                            callback: function(value) {
+                                return value.toFixed(1);
+                            }
+                        },
                         grid: {
-                            color: 'rgba(0, 0, 0, 0.1)'
+                            display: true,
+                            color: 'rgba(0, 0, 0, 0.2)',
+                            lineWidth: 1,
+                            drawTicks: true,
+                            tickLength: 8
                         }
                     },
                     y: {
@@ -329,8 +334,19 @@ function displayCoordinateCharts(marketIdealValues) {
                         },
                         beginAtZero: true,
                         max: 5,
+                        min: 0,
+                        ticks: {
+                            stepSize: 0.5,
+                            callback: function(value) {
+                                return value.toFixed(1);
+                            }
+                        },
                         grid: {
-                            color: 'rgba(0, 0, 0, 0.1)'
+                            display: true,
+                            color: 'rgba(0, 0, 0, 0.2)',
+                            lineWidth: 1,
+                            drawTicks: true,
+                            tickLength: 8
                         }
                     }
                 },
@@ -345,7 +361,55 @@ function displayCoordinateCharts(marketIdealValues) {
                     }
                 },
                 onHover: function(event, elements) {
-                    event.native.target.style.cursor = elements.length > 0 ? 'pointer' : 'default';
+                    event.native.target.style.cursor = elements.length > 0 ? 'pointer' : 'crosshair';
+                    
+                    // 显示实时坐标
+                    const chart = this;
+                    const canvasPosition = Chart.helpers.getRelativePosition(event, chart);
+                    
+                    // 获取鼠标位置对应的数据坐标
+                    const dataX = chart.scales.x.getValueForPixel(canvasPosition.x);
+                    const dataY = chart.scales.y.getValueForPixel(canvasPosition.y);
+                    
+                    // 创建或更新坐标显示
+                    let coordDisplay = document.getElementById(`coord-display-${market}`);
+                    if (!coordDisplay) {
+                        coordDisplay = document.createElement('div');
+                        coordDisplay.id = `coord-display-${market}`;
+                        coordDisplay.style.cssText = `
+                            position: absolute;
+                            top: 10px;
+                            right: 10px;
+                            background: rgba(255, 255, 255, 0.9);
+                            padding: 6px 10px;
+                            border-radius: 4px;
+                            font-size: 11px;
+                            border: 1px solid #ccc;
+                            pointer-events: none;
+                            z-index: 100;
+                            font-family: monospace;
+                        `;
+                        chart.canvas.parentElement.style.position = 'relative';
+                        chart.canvas.parentElement.appendChild(coordDisplay);
+                    }
+                    
+                    if (dataX >= 0 && dataX <= 5 && dataY >= 0 && dataY <= 5) {
+                        coordDisplay.innerHTML = `
+                            <div style="color: #666; font-weight: bold;">实时坐标</div>
+                            <div>扭矩: ${Math.max(0, Math.min(5, dataX)).toFixed(2)}</div>
+                            <div>电阻: ${Math.max(0, Math.min(5, dataY)).toFixed(2)}</div>
+                        `;
+                        coordDisplay.style.display = 'block';
+                    } else {
+                        coordDisplay.style.display = 'none';
+                    }
+                },
+                onLeave: function(event) {
+                    // 隐藏坐标显示
+                    const coordDisplay = document.getElementById(`coord-display-${market}`);
+                    if (coordDisplay) {
+                        coordDisplay.style.display = 'none';
+                    }
                 }
             }
         });
@@ -426,7 +490,7 @@ function showTrend(indicator, type) {
     
     // 默认显示所有产品
     if (allTrendData.length > 0) {
-        createTrendChart(allTrendData, allTrendData, indicator, type);
+        createTrendChart(allTrendData, allTrendData, indicator, type, 'show-all');
     }
     
     modal.classList.add('show');
@@ -437,7 +501,7 @@ function createProductSelector(allTrendData, indicator, type) {
     const selector = document.getElementById('product-selector');
     selector.innerHTML = '';
     
-    // 添加"全部显示"按钮
+    // 添加"显示全部"按钮
     const allBtn = document.createElement('button');
     allBtn.className = 'px-3 py-1.5 text-sm rounded bg-blue-500 text-white transition-colors';
     allBtn.textContent = '显示全部';
@@ -450,9 +514,26 @@ function createProductSelector(allTrendData, indicator, type) {
         allBtn.classList.remove('bg-gray-200', 'text-gray-700');
         allBtn.classList.add('bg-blue-500', 'text-white');
         
-        createTrendChart(allTrendData, allTrendData, indicator, type);
+        createTrendChart(allTrendData, allTrendData, indicator, type, 'show-all');
     };
     selector.appendChild(allBtn);
+
+    // 添加"隐藏全部"按钮
+    const hideAllBtn = document.createElement('button');
+    hideAllBtn.className = 'px-3 py-1.5 text-sm rounded bg-gray-200 text-gray-700 hover:bg-gray-300 transition-colors';
+    hideAllBtn.textContent = '隐藏全部';
+    hideAllBtn.onclick = () => {
+        // 更新按钮状态
+        selector.querySelectorAll('button').forEach(btn => {
+            btn.classList.remove('bg-blue-500', 'text-white');
+            btn.classList.add('bg-gray-200', 'text-gray-700');
+        });
+        hideAllBtn.classList.remove('bg-gray-200', 'text-gray-700');
+        hideAllBtn.classList.add('bg-blue-500', 'text-white');
+        
+        createTrendChart(allTrendData, allTrendData, indicator, type, 'hide-all');
+    };
+    selector.appendChild(hideAllBtn);
     
     // 添加各个产品按钮
     allTrendData.forEach((item, index) => {
@@ -476,7 +557,7 @@ function createProductSelector(allTrendData, indicator, type) {
 }
 
 // 创建趋势图表
-function createTrendChart(trendData, allTrendData = null, indicator = '', type = '') {
+function createTrendChart(trendData, allTrendData = null, indicator = '', type = '', mode = 'show-all') {
     const ctx = document.getElementById('trend-chart');
     
     // 销毁之前的图表
@@ -498,7 +579,8 @@ function createTrendChart(trendData, allTrendData = null, indicator = '', type =
         fill: false,
         pointRadius: 6,
         pointHoverRadius: 8,
-        borderWidth: 3
+        borderWidth: 3,
+        hidden: mode === 'hide-all' // 如果是隐藏全部模式，设置为隐藏
     }));
 
     trendChart = new Chart(ctx, {
