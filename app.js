@@ -776,9 +776,9 @@ function displayMarketPricingTable(marketPricing) {
             if (showComparison && prevValue !== null && prevValue !== undefined) {
                 const comparison = calculateComparison(currentValue, prevValue);
                 if (comparison.change !== 0) {
-                    const arrow = comparison.direction === 'up' ? '↗' : '↘';
-                    const color = comparison.direction === 'up' ? 'text-green-600' : 'text-red-600';
-                    cellContent += ` <span class="${color} text-xs">${arrow}${Math.abs(comparison.change).toFixed(1)}</span>`;
+                    cellContent += `<br><span class="comparison-value ${comparison.className}">
+                        ${comparison.changeText}
+                    </span>`;
                 }
             }
             
@@ -1874,12 +1874,12 @@ function calculateComparison(current, previous) {
     
     if (change > 0) {
         className = 'trend-up';
-        changeText = `↑ ${Math.abs(changePercent)}%`;
+        changeText = `↑ ${Math.abs(changePercent)}%（${Math.abs(change).toFixed(1)}）`;
     } else if (change < 0) {
         className = 'trend-down';
-        changeText = `↓ ${Math.abs(changePercent)}%`;
+        changeText = `↓ ${Math.abs(changePercent)}%（${Math.abs(change).toFixed(1)}）`;
     } else {
-        changeText = '→ 0%';
+        changeText = '→ 0%（0）';
     }
     
     return { change, changeText, className };
