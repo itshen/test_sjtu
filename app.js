@@ -695,7 +695,8 @@ function displayIndustryData(industryData) {
             }
             
             const predictionClass = isPrediction ? 'prediction-data' : '';
-            return `<td class="border border-gray-300 px-3 py-2 text-center text-sm ${predictionClass}">${cellContent}</td>`;
+            const highlightClass = isHighlightedProduct(product) ? 'highlighted-product' : '';
+            return `<td class="border border-gray-300 px-3 py-2 text-center text-sm ${predictionClass} ${highlightClass}">${cellContent}</td>`;
         }).join('');
 
         const predictionClass = isPrediction ? 'prediction-data' : '';
@@ -739,7 +740,8 @@ function displayMarketShareTable(marketShare) {
             }
             
             const predictionClass = isPrediction ? 'prediction-data' : '';
-            return `<td class="border border-gray-300 px-3 py-2 text-center text-sm ${predictionClass}">${cellContent}</td>`;
+            const highlightClass = isHighlightedProduct(product) ? 'highlighted-product' : '';
+            return `<td class="border border-gray-300 px-3 py-2 text-center text-sm ${predictionClass} ${highlightClass}">${cellContent}</td>`;
         }).join('');
 
         const predictionClass = isPrediction ? 'prediction-data' : '';
@@ -782,12 +784,16 @@ function displayMarketPricingTable(marketPricing) {
                 }
             }
             
-            return cellContent;
+            return { content: cellContent, product: product };
         });
         
         row.innerHTML = `
             <td class="border border-gray-300 px-4 py-2 font-medium bg-gray-50">组${group}</td>
-            ${cells.map(cell => `<td class="border border-gray-300 px-4 py-2 text-center ${isPrediction ? 'bg-purple-50 font-semibold text-purple-700' : ''}">${cell}</td>`).join('')}
+            ${cells.map(cell => {
+                const highlightClass = isHighlightedProduct(cell.product) ? 'highlighted-product' : '';
+                const predictionClass = isPrediction ? 'bg-purple-50 font-semibold text-purple-700' : '';
+                return `<td class="border border-gray-300 px-4 py-2 text-center ${predictionClass} ${highlightClass}">${cell.content}</td>`;
+            }).join('')}
         `;
         tbody.appendChild(row);
     });
@@ -1861,6 +1867,15 @@ function getPreviousPeriod(period) {
 }
 
 // 计算环比变化
+// 判断产品是否需要高亮显示
+function isHighlightedProduct(product) {
+    const highlightedProducts = [
+        '尤菲亚P3', '纳达卡P1', '尼赫鲁P2',  // 市场份额和定价表格格式
+        '尤菲亚3', '纳达卡1', '尼赫鲁2'      // 行业数据表格格式
+    ];
+    return highlightedProducts.includes(product);
+}
+
 function calculateComparison(current, previous) {
     if (previous === 0 || previous === null || previous === undefined) {
         return { change: 0, changeText: '', className: 'trend-neutral' };
