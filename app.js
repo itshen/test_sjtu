@@ -683,7 +683,7 @@ function displayIndustryData(industryData) {
             const currentValue = industryData[metric][product];
             const prevValue = prevData ? prevData[metric]?.[product] : null;
             
-            let cellContent = formatValue(currentValue);
+            let cellContent = formatValue(currentValue, metric);
             
             if (showComparison && prevValue !== null && currentValue !== null && prevValue !== undefined) {
                 const comparison = calculateComparison(currentValue, prevValue);
