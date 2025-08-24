@@ -15,7 +15,7 @@ let teamPositionDetailChart = null; // 团队位置详细图表实例
 let currentDetailMarket = ''; // 当前详细查看的市场
 
 // 期间顺序定义
-const periodOrder = ['1A', '1B', '2', '3', '4', '5'];
+const periodOrder = ['1A', '1B', '2', '3', '4', '5', '6'];
 
 // 预测算法：线性回归
 function linearRegression(xValues, yValues) {
@@ -296,11 +296,12 @@ function predictValueByType(historicalValues, dataType) {
     }
 }
 
-// 生成Round 5预测数据
+// 生成Round 6预测数据
 function generatePredictionData() {
-    // 使用前3轮数据进行预测（Round 2、3、4）
-    const periods = ['2', '3', '4'];
+    // 使用前3轮数据进行预测（Round 3、4、5）
+    const periods = ['3', '4', '5'];
     const predictionData = {
+        period: "6",
         industryData: {},
         marketShare: {},
         marketPricing: {},
@@ -441,10 +442,10 @@ function loadAllData() {
         
         // 生成预测数据
         const predictionData = generatePredictionData();
-        allData['5'] = predictionData;
+        allData['6'] = predictionData;
         
         console.log('所有数据加载完成:', allData);
-        console.log('已生成Round 5预测数据:', predictionData);
+        console.log('已生成Round 6预测数据:', predictionData);
     } catch (error) {
         console.error('数据加载失败:', error);
     }
@@ -636,7 +637,7 @@ function displayData(period) {
     }
 
     const data = allData[period];
-    const isPrediction = period === '5';
+    const isPrediction = period === '6';
     
     // 显示/隐藏预测算法说明按钮
     const predictionButtons = document.querySelectorAll('.prediction-info-trigger');
@@ -671,7 +672,7 @@ function displayIndustryData(industryData) {
     const tbody = document.getElementById('industry-data-tbody');
     tbody.innerHTML = '';
 
-    const isPrediction = currentPeriod === '5';
+    const isPrediction = currentPeriod === '6';
     
     // 获取上一个期间的数据用于环比
     const prevPeriod = getPreviousPeriod(currentPeriod);
@@ -716,7 +717,7 @@ function displayMarketShareTable(marketShare) {
     const tbody = document.getElementById('market-share-tbody');
     tbody.innerHTML = '';
 
-    const isPrediction = currentPeriod === '5';
+    const isPrediction = currentPeriod === '6';
     
     // 获取上一个期间的数据用于环比
     const prevPeriod = getPreviousPeriod(currentPeriod);
@@ -761,7 +762,7 @@ function displayMarketPricingTable(marketPricing) {
     const tbody = document.getElementById('market-pricing-tbody');
     tbody.innerHTML = '';
 
-    const isPrediction = currentPeriod === '5';
+    const isPrediction = currentPeriod === '6';
     
     // 获取上一个期间的数据用于环比
     const prevPeriod = getPreviousPeriod(currentPeriod);
@@ -913,9 +914,9 @@ function displayMarketShare(marketShare) {
             plugins: {
                 title: {
                     display: true,
-                    text: `组${currentGroup} - 市场份额分布 (${currentPeriod}期间${currentPeriod === '4' ? ' - 预测数据' : ''})`,
+                    text: `组${currentGroup} - 市场份额分布 (${currentPeriod}期间${currentPeriod === '6' ? ' - 预测数据' : ''})`,
                     font: { size: 16, weight: 'bold' },
-                    color: currentPeriod === '4' ? '#8B5CF6' : '#333'
+                    color: currentPeriod === '6' ? '#8B5CF6' : '#333'
                 },
                 legend: {
                     display: true,
@@ -1099,9 +1100,9 @@ function displayProductComparison(marketShare) {
             plugins: {
                 title: {
                     display: true,
-                    text: `${currentProduct} - 各组市场份额对比 (${currentPeriod}期间${currentPeriod === '4' ? ' - 预测数据' : ''})`,
+                    text: `${currentProduct} - 各组市场份额对比 (${currentPeriod}期间${currentPeriod === '6' ? ' - 预测数据' : ''})`,
                     font: { size: 16, weight: 'bold' },
-                    color: currentPeriod === '4' ? '#8B5CF6' : '#333'
+                    color: currentPeriod === '6' ? '#8B5CF6' : '#333'
                 },
                 legend: {
                     display: false
@@ -1675,8 +1676,8 @@ function createTrendChart(trendData, allTrendData = null, indicator = '', type =
 
     const datasets = trendData.map((item, index) => {
         // 分离预测数据点
-        const historicalData = item.data.filter(point => point.x !== '5');
-        const predictionData = item.data.filter(point => point.x === '5');
+        const historicalData = item.data.filter(point => point.x !== '6');
+        const predictionData = item.data.filter(point => point.x === '6');
         
         const baseColor = colors[index % colors.length];
         const datasets = [];
@@ -2078,7 +2079,7 @@ function displayTeamComparison(teamCoordinates) {
     if (!tbody || !teamCoordinates) return;
     
     tbody.innerHTML = '';
-    const isPrediction = currentPeriod === '5';
+    const isPrediction = currentPeriod === '6';
 
     // 获取上一个期间的数据用于环比
     const prevPeriod = getPreviousPeriod(currentPeriod);
@@ -2759,9 +2760,9 @@ function createTeamPositionDetailChart(market) {
             plugins: {
                 title: {
                     display: true,
-                    text: `${market}市场 - 各组产品特性坐标详细视图 (${currentPeriod}期间${currentPeriod === '4' ? ' - 预测数据' : ''})`,
+                    text: `${market}市场 - 各组产品特性坐标详细视图 (${currentPeriod}期间${currentPeriod === '6' ? ' - 预测数据' : ''})`,
                     font: { size: 16, weight: 'bold' },
-                    color: currentPeriod === '4' ? '#8B5CF6' : '#333'
+                    color: currentPeriod === '6' ? '#8B5CF6' : '#333'
                 },
                 legend: {
                     display: false  // 隐藏图例，使用侧边栏控制
