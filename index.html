@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>市场数据可视化分析平台</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .chart-container {
+            position: relative;
+        }
+        .comparison-value {
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+        .trend-up {
+            color: #dc2626;
+        }
+        .trend-down {
+            color: #16a34a;
+        }
+        .trend-neutral {
+            color: #6b7280;
+        }
+        .coordinate-point {
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .coordinate-point:hover {
+            transform: scale(1.2);
+        }
+        .tooltip {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            pointer-events: none;
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        .trend-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 2000;
+        }
+        .trend-modal.show {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto px-3 py-4">
+        <!-- 标题和时间选择器 -->
+        <div class="bg-white rounded-lg shadow-md p-4 mb-4">
+            <div class="flex flex-wrap items-center justify-between gap-4">
+                <h1 class="text-2xl font-bold text-gray-800">市场数据可视化分析平台</h1>
+                <div class="flex items-center gap-3">
+                    <span class="text-sm font-medium text-gray-700">选择期间:</span>
+                    <div class="flex gap-1">
+                        <button class="period-btn bg-blue-500 text-white px-3 py-1.5 rounded text-sm hover:bg-blue-600 transition-colors" data-period="1A">1A</button>
+                        <button class="period-btn bg-gray-300 text-gray-700 px-3 py-1.5 rounded text-sm hover:bg-gray-400 transition-colors" data-period="1B">1B</button>
+                        <button class="period-btn bg-gray-300 text-gray-700 px-3 py-1.5 rounded text-sm hover:bg-gray-400 transition-colors" data-period="2">2</button>
+                        <button class="period-btn bg-gray-300 text-gray-700 px-3 py-1.5 rounded text-sm hover:bg-gray-400 transition-colors" data-period="3">3</button>
+                        <button class="period-btn bg-gray-300 text-gray-700 px-3 py-1.5 rounded text-sm opacity-50 cursor-not-allowed" data-period="4" disabled>4</button>
+                        <button class="period-btn bg-gray-300 text-gray-700 px-3 py-1.5 rounded text-sm opacity-50 cursor-not-allowed" data-period="5" disabled>5</button>
+                        <button class="period-btn bg-gray-300 text-gray-700 px-3 py-1.5 rounded text-sm opacity-50 cursor-not-allowed" data-period="6" disabled>6</button>
+                    </div>
+                    <label class="flex items-center gap-2 text-sm">
+                        <input type="checkbox" id="show-comparison" class="rounded">
+                        <span>显示环比</span>
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <!-- 行业数据表格 -->
+        <div class="bg-white rounded-lg shadow-md p-4 mb-4">
+            <h2 class="text-xl font-bold text-gray-800 mb-3">整个行业数据</h2>
+            <div class="overflow-x-auto">
+                <table class="w-full table-auto border-collapse">
+                    <thead>
+                        <tr class="bg-gray-50">
+                            <th class="border border-gray-300 px-4 py-2 text-left">指标</th>
+                            <th class="border border-gray-300 px-4 py-2 text-center">尤菲亚1</th>
+                            <th class="border border-gray-300 px-4 py-2 text-center">尤菲亚2</th>
+                            <th class="border border-gray-300 px-4 py-2 text-center">尤菲亚3</th>
+                            <th class="border border-gray-300 px-4 py-2 text-center">纳达卡1</th>
+                            <th class="border border-gray-300 px-4 py-2 text-center">纳达卡2</th>
+                            <th class="border border-gray-300 px-4 py-2 text-center">纳达卡3</th>
+                            <th class="border border-gray-300 px-4 py-2 text-center">尼赫鲁1</th>
+                            <th class="border border-gray-300 px-4 py-2 text-center">尼赫鲁2</th>
+                            <th class="border border-gray-300 px-4 py-2 text-center">尼赫鲁3</th>
+                        </tr>
+                    </thead>
+                    <tbody id="industry-data-tbody">
+                        <!-- 动态生成 -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- 市场份额表格 -->
+        <div class="bg-white rounded-lg shadow-md p-4 mb-4">
+            <h2 class="text-xl font-bold text-gray-800 mb-3">市场份额</h2>
+            <div class="overflow-x-auto">
+                <table class="w-full table-auto border-collapse">
+                    <thead>
+                        <tr class="bg-gray-50">
+                            <th class="border border-gray-300 px-4 py-2 text-left">组序</th>
+                            <th class="border border-gray-300 px-4 py-2 text-center">尤菲亚P1</th>
+                            <th class="border border-gray-300 px-4 py-2 text-center">尤菲亚P2</th>
+                            <th class="border border-gray-300 px-4 py-2 text-center">尤菲亚P3</th>
+                            <th class="border border-gray-300 px-4 py-2 text-center">纳达卡P1</th>
+                            <th class="border border-gray-300 px-4 py-2 text-center">纳达卡P2</th>
+                            <th class="border border-gray-300 px-4 py-2 text-center">纳达卡P3</th>
+                            <th class="border border-gray-300 px-4 py-2 text-center">尼赫鲁P1</th>
+                            <th class="border border-gray-300 px-4 py-2 text-center">尼赫鲁P2</th>
+                            <th class="border border-gray-300 px-4 py-2 text-center">尼赫鲁P3</th>
+                        </tr>
+                    </thead>
+                    <tbody id="market-share-tbody">
+                        <!-- 动态生成 -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- 市场理想值坐标图 -->
+        <div class="bg-white rounded-lg shadow-md p-4 mb-4">
+            <h2 class="text-xl font-bold text-gray-800 mb-3">市场理想值 - 扭矩vs电阻坐标图</h2>
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                <!-- 尤菲亚市场 -->
+                <div class="border rounded-lg p-3">
+                    <h3 class="text-lg font-semibold text-gray-700 mb-2 text-center">尤菲亚市场</h3>
+                    <div class="chart-container h-64">
+                        <canvas id="chart-尤菲亚"></canvas>
+                    </div>
+                </div>
+                <!-- 纳达卡市场 -->
+                <div class="border rounded-lg p-3">
+                    <h3 class="text-lg font-semibold text-gray-700 mb-2 text-center">纳达卡市场</h3>
+                    <div class="chart-container h-64">
+                        <canvas id="chart-纳达卡"></canvas>
+                    </div>
+                </div>
+                <!-- 尼赫鲁市场 -->
+                <div class="border rounded-lg p-3">
+                    <h3 class="text-lg font-semibold text-gray-700 mb-2 text-center">尼赫鲁市场</h3>
+                    <div class="chart-container h-64">
+                        <canvas id="chart-尼赫鲁"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 趋势分析模态框 -->
+    <div id="trend-modal" class="trend-modal">
+        <div class="bg-white w-full h-full flex flex-col">
+            <div class="p-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
+                <div class="flex items-center gap-4">
+                    <h3 id="trend-title" class="text-xl font-semibold text-gray-800"></h3>
+                    <div class="text-sm text-gray-600">
+                        键盘提示: ← → 切换期间 | ESC 关闭
+                    </div>
+                </div>
+                <button id="close-trend" class="text-gray-500 hover:text-gray-700 text-3xl">&times;</button>
+            </div>
+            <div class="flex-1 p-6 overflow-hidden">
+                <div class="h-full">
+                    <!-- 产品选择器 -->
+                    <div class="mb-4">
+                        <div class="flex flex-wrap gap-2" id="product-selector">
+                            <!-- 动态生成 -->
+                        </div>
+                    </div>
+                    <!-- 图表容器 -->
+                    <div class="h-[calc(100%-80px)]">
+                        <canvas id="trend-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 提示框 -->
+    <div id="tooltip" class="tooltip"></div>
+
+    <script src="app.js"></script>
+</body>
+</html>
