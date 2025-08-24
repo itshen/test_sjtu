@@ -89,13 +89,14 @@
         // 密码有效期（分钟）
         const PASSWORD_VALIDITY = 1;
 
-        // 生成基于时间的密码
-        function generateTimeBasedPassword(seed) {
+        // 生成基于时间的密码（所有人在同一分钟内密码相同）
+        function generateTimeBasedPassword() {
             const now = new Date();
             const timeSlot = Math.floor(now.getTime() / (PASSWORD_VALIDITY * 60 * 1000));
             
-            // 使用简单的哈希算法生成密码
-            const combined = seed + timeSlot.toString();
+            // 使用固定种子，确保所有人在同一时间片内获得相同密码
+            const fixedSeed = 'SJTU_SYSTEM_2024';
+            const combined = fixedSeed + timeSlot.toString();
             let hash = 0;
             for (let i = 0; i < combined.length; i++) {
                 const char = combined.charCodeAt(i);
@@ -164,7 +165,7 @@
                 return;
             }
             
-            const password = generateTimeBasedPassword(adminPassword);
+            const password = generateTimeBasedPassword();
             showResult(password);
         }
 

@@ -12,7 +12,198 @@ let currentView = 'by-group';
 let marketShareHiddenItems = {}; // 记录每个组的隐藏状态
 
 // 期间顺序定义
-const periodOrder = ['1A', '1B', '2', '3'];
+const periodOrder = ['1A', '1B', '2', '3', '4'];
+
+// 预测算法：线性回归
+function linearRegression(xValues, yValues) {
+    const n = xValues.length;
+    if (n < 2) return { slope: 0, intercept: yValues[0] || 0 };
+    
+    const sumX = xValues.reduce((a, b) => a + b, 0);
+    const sumY = yValues.reduce((a, b) => a + b, 0);
+    const sumXY = xValues.reduce((sum, x, i) => sum + x * yValues[i], 0);
+    const sumXX = xValues.reduce((sum, x) => sum + x * x, 0);
+    
+    const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
+    const intercept = (sumY - slope * sumX) / n;
+    
+    return { slope, intercept };
+}
+
+// 为订单数据预测（大数值，通常呈增长趋势）
+function predictOrderData(historicalValues) {
+    const validValues = historicalValues.filter(val => 
+        val !== null && val !== undefined && !isNaN(parseFloat(val))
+    ).map(val => parseFloat(val));
+    
+    if (validValues.length === 0) return null;
+    if (validValues.length === 1) {
+        // 订单数据通常有5-15%的增长
+        return Math.round(validValues[0] * 1.1 * 100) / 100;
+    }
+    
+    // 使用线性回归预测
+    const xValues = validValues.map((_, index) => index + 1);
+    const { slope, intercept } = linearRegression(xValues, validValues);
+    const prediction = slope * (validValues.length + 1) + intercept;
+    
+    // 订单数据限制在合理范围内
+    const maxHistorical = Math.max(...validValues);
+    const avgGrowth = validValues.length > 1 ? (validValues[validValues.length - 1] / validValues[0]) ** (1 / (validValues.length - 1)) : 1.1;
+    const expectedValue = validValues[validValues.length - 1] * avgGrowth;
+    
+    return Math.round(Math.max(prediction, expectedValue * 0.8) * 100) / 100;
+}
+
+// 为收入数据预测（与订单相关，但有波动）
+function predictRevenueData(historicalValues) {
+    const validValues = historicalValues.filter(val => 
+        val !== null && val !== undefined && !isNaN(parseFloat(val))
+    ).map(val => parseFloat(val));
+    
+    if (validValues.length === 0) return null;
+    if (validValues.length === 1) {
+        return Math.round(validValues[0] * 1.08 * 100) / 100; // 8%增长
+    }
+    
+    // 收入数据使用平均增长率预测
+    const growth = validValues[validValues.length - 1] / validValues[0];
+    const avgGrowthRate = growth ** (1 / (validValues.length - 1));
+    const prediction = validValues[validValues.length - 1] * avgGrowthRate;
+    
+    return Math.round(prediction * 100) / 100;
+}
+
+// 为比率数据预测（百分比，相对稳定）
+function predictRateData(historicalValues) {
+    const validValues = historicalValues.filter(val => 
+        val !== null && val !== undefined && !isNaN(parseFloat(val))
+    ).map(val => parseFloat(val));
+    
+    if (validValues.length === 0) return null;
+    if (validValues.length === 1) {
+        // 比率数据变化较小，固定1%增长
+        return Math.round(validValues[0] * 1.01 * 100) / 100;
+    }
+    
+    // 使用加权平均，最近的数据权重更大
+    const weights = validValues.map((_, index) => index + 1);
+    const weightedSum = validValues.reduce((sum, val, index) => sum + val * weights[index], 0);
+    const totalWeight = weights.reduce((sum, weight) => sum + weight, 0);
+    const weightedAvg = weightedSum / totalWeight;
+    
+    // 添加小幅波动
+    const variation = (validValues[validValues.length - 1] - validValues[0]) / validValues.length;
+    const prediction = weightedAvg + variation;
+    
+    return Math.round(prediction * 100) / 100;
+}
+
+// 为成本数据预测（通常有通胀影响）
+function predictCostData(historicalValues) {
+    const validValues = historicalValues.filter(val => 
+        val !== null && val !== undefined && !isNaN(parseFloat(val))
+    ).map(val => parseFloat(val));
+    
+    if (validValues.length === 0) return null;
+    if (validValues.length === 1) {
+        return Math.round(validValues[0] * 1.05 * 100) / 100; // 5%通胀
+    }
+    
+    // 成本数据通常有稳定的增长趋势
+    const xValues = validValues.map((_, index) => index + 1);
+    const { slope, intercept } = linearRegression(xValues, validValues);
+    let prediction = slope * (validValues.length + 1) + intercept;
+    
+    // 确保成本不会下降太多
+    const lastValue = validValues[validValues.length - 1];
+    if (prediction < lastValue * 0.95) {
+        prediction = lastValue * 1.02; // 最少2%增长
+    }
+    
+    return Math.round(prediction * 100) / 100;
+}
+
+// 智能预测函数，根据数据类型选择合适的预测方法
+function predictValueByType(historicalValues, dataType) {
+    switch (dataType) {
+        case '整个行业订单':
+            return predictOrderData(historicalValues);
+        case '整个行业收入（百万）':
+            return predictRevenueData(historicalValues);
+        case '平均行业毛利率':
+            return predictRateData(historicalValues);
+        case '最低期末库存成本':
+            return predictCostData(historicalValues);
+        default:
+            // 默认使用简单的线性预测
+            return predictRevenueData(historicalValues);
+    }
+}
+
+// 生成Round 4预测数据
+function generatePredictionData() {
+    // 使用前2轮数据进行预测（Round 2 和 Round 3）
+    const periods = ['2', '3'];
+    const predictionData = {
+        industryData: {},
+        marketShare: {},
+        marketIdealValues: {}
+    };
+    
+    // 预测行业数据
+    const indicators = ['整个行业订单', '整个行业收入（百万）', '平均行业毛利率', '最低期末库存成本'];
+    const products = ['尤菲亚1', '尤菲亚2', '尤菲亚3', '纳达卡1', '纳达卡2', '纳达卡3', '尼赫鲁1', '尼赫鲁2', '尼赫鲁3'];
+    
+    indicators.forEach(indicator => {
+        predictionData.industryData[indicator] = {};
+        products.forEach(product => {
+            const historicalValues = periods.map(period => 
+                allData[period]?.industryData?.[indicator]?.[product]
+            );
+            predictionData.industryData[indicator][product] = predictValueByType(historicalValues, indicator);
+        });
+    });
+    
+    // 预测市场份额
+    const groups = ['1', '2', '3', '4', '5'];
+    const shareProducts = ['尤菲亚P1', '尤菲亚P2', '尤菲亚P3', '纳达卡P1', '纳达卡P2', '纳达卡P3', '尼赫鲁P1', '尼赫鲁P2', '尼赫鲁P3'];
+    
+    groups.forEach(group => {
+        predictionData.marketShare[group] = {};
+        shareProducts.forEach(product => {
+            const historicalValues = periods.map(period => 
+                allData[period]?.marketShare?.[group]?.[product]
+            );
+            // 市场份额使用比率数据预测逻辑
+            predictionData.marketShare[group][product] = predictRateData(historicalValues);
+        });
+    });
+    
+    // 预测市场理想值
+    const markets = ['尤菲亚', '纳达卡', '尼赫鲁'];
+    const magnetProducts = ['雷墨磁1', '雷墨磁2', '雷墨磁3'];
+    
+    markets.forEach(market => {
+        predictionData.marketIdealValues[market] = {};
+        magnetProducts.forEach(product => {
+            const historicalTorque = periods.map(period => 
+                allData[period]?.marketIdealValues?.[market]?.[product]?.扭矩
+            );
+            const historicalResistance = periods.map(period => 
+                allData[period]?.marketIdealValues?.[market]?.[product]?.电阻
+            );
+            
+            predictionData.marketIdealValues[market][product] = {
+                // 扭矩和电阻使用技术参数预测（相对稳定）
+                扭矩: predictRateData(historicalTorque),
+                电阻: predictRateData(historicalResistance)
+            };
+        });
+    });
+    
+    return predictionData;
+}
 
 // 页面加载完成后初始化
 document.addEventListener('DOMContentLoaded', function() {
@@ -33,8 +224,14 @@ document.addEventListener('DOMContentLoaded', function() {
 function loadAllData() {
     try {
         // 直接使用内嵌的数据
-        allData = DATA_STORAGE;
+        allData = { ...DATA_STORAGE };
+        
+        // 生成预测数据
+        const predictionData = generatePredictionData();
+        allData['4'] = predictionData;
+        
         console.log('所有数据加载完成:', allData);
+        console.log('已生成Round 4预测数据:', predictionData);
     } catch (error) {
         console.error('数据加载失败:', error);
     }
@@ -159,8 +356,38 @@ function initEventListeners() {
         // ESC键关闭模态框
         if (e.key === 'Escape') {
             closeTrendModal();
+            closePredictionInfoModal();
         }
     });
+
+    // 预测算法说明按钮
+    document.querySelectorAll('.prediction-info-trigger').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const modal = document.getElementById('prediction-info-modal');
+            modal.classList.remove('hidden');
+        });
+    });
+
+    // 关闭预测算法说明模态框
+    const closePredictionModal = document.getElementById('close-prediction-modal');
+    const closePredictionModalBtn = document.getElementById('close-prediction-modal-btn');
+    
+    if (closePredictionModal) {
+        closePredictionModal.addEventListener('click', closePredictionInfoModal);
+    }
+    if (closePredictionModalBtn) {
+        closePredictionModalBtn.addEventListener('click', closePredictionInfoModal);
+    }
+
+    // 点击模态框背景关闭
+    const predictionModal = document.getElementById('prediction-info-modal');
+    if (predictionModal) {
+        predictionModal.addEventListener('click', function(e) {
+            if (e.target === this) {
+                closePredictionInfoModal();
+            }
+        });
+    }
 }
 
 // 显示指定期间的数据
@@ -171,6 +398,18 @@ function displayData(period) {
     }
 
     const data = allData[period];
+    const isPrediction = period === '4';
+    
+    // 显示/隐藏预测算法说明按钮
+    const predictionButtons = document.querySelectorAll('.prediction-info-trigger');
+    predictionButtons.forEach(btn => {
+        if (isPrediction) {
+            btn.classList.remove('hidden');
+        } else {
+            btn.classList.add('hidden');
+        }
+    });
+    
     displayIndustryData(data.industryData);
     displayMarketShareTable(data.marketShare);
     
@@ -189,6 +428,8 @@ function displayIndustryData(industryData) {
     const tbody = document.getElementById('industry-data-tbody');
     tbody.innerHTML = '';
 
+    const isPrediction = currentPeriod === '4';
+    
     // 获取上一个期间的数据用于环比
     const prevPeriod = getPreviousPeriod(currentPeriod);
     const prevData = prevPeriod ? allData[prevPeriod]?.industryData : null;
@@ -210,11 +451,13 @@ function displayIndustryData(industryData) {
                 }
             }
             
-            return `<td class="border border-gray-300 px-3 py-2 text-center text-sm">${cellContent}</td>`;
+            const predictionClass = isPrediction ? 'prediction-data' : '';
+            return `<td class="border border-gray-300 px-3 py-2 text-center text-sm ${predictionClass}">${cellContent}</td>`;
         }).join('');
 
+        const predictionClass = isPrediction ? 'prediction-data' : '';
         row.innerHTML = `
-            <td class="border border-gray-300 px-3 py-2 font-medium cursor-pointer hover:bg-blue-50 transition-colors text-sm" 
+            <td class="border border-gray-300 px-3 py-2 font-medium cursor-pointer hover:bg-blue-50 transition-colors text-sm ${predictionClass}" 
                 onclick="showTrend('${metric}', 'industry')" title="点击查看趋势">
                 ${metric} 📈
             </td>
@@ -229,6 +472,8 @@ function displayMarketShareTable(marketShare) {
     const tbody = document.getElementById('market-share-tbody');
     tbody.innerHTML = '';
 
+    const isPrediction = currentPeriod === '4';
+    
     // 获取上一个期间的数据用于环比
     const prevPeriod = getPreviousPeriod(currentPeriod);
     const prevData = prevPeriod ? allData[prevPeriod]?.marketShare : null;
@@ -250,11 +495,13 @@ function displayMarketShareTable(marketShare) {
                 }
             }
             
-            return `<td class="border border-gray-300 px-3 py-2 text-center text-sm">${cellContent}</td>`;
+            const predictionClass = isPrediction ? 'prediction-data' : '';
+            return `<td class="border border-gray-300 px-3 py-2 text-center text-sm ${predictionClass}">${cellContent}</td>`;
         }).join('');
 
+        const predictionClass = isPrediction ? 'prediction-data' : '';
         row.innerHTML = `
-            <td class="border border-gray-300 px-3 py-2 font-medium cursor-pointer hover:bg-blue-50 transition-colors text-sm" 
+            <td class="border border-gray-300 px-3 py-2 font-medium cursor-pointer hover:bg-blue-50 transition-colors text-sm ${predictionClass}" 
                 onclick="showTrend('组${group}', 'marketShare')" title="点击查看趋势">
                 组 ${group} 📈
             </td>
@@ -329,6 +576,47 @@ function displayMarketShare(marketShare) {
                     }
                 });
             }
+        }, {
+            id: 'pieValueLabels',
+            afterDraw: function(chart) {
+                const ctx = chart.ctx;
+                const data = chart.data;
+                const meta = chart.getDatasetMeta(0);
+                
+                meta.data.forEach((element, index) => {
+                    if (!element.hidden) {
+                        const value = data.datasets[0].data[index];
+                        const label = data.labels[index];
+                        
+                        // 计算标签位置
+                        const midAngle = element.startAngle + (element.endAngle - element.startAngle) / 2;
+                        const x = element.x + Math.cos(midAngle) * (element.outerRadius * 0.7);
+                        const y = element.y + Math.sin(midAngle) * (element.outerRadius * 0.7);
+                        
+                        // 绘制背景
+                        ctx.save();
+                        ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+                        ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
+                        ctx.lineWidth = 1;
+                        
+                        const text = `${value}%`;
+                        ctx.font = 'bold 12px Arial';
+                        const textWidth = ctx.measureText(text).width;
+                        const padding = 4;
+                        
+                        // 绘制背景矩形
+                        ctx.fillRect(x - textWidth/2 - padding, y - 8, textWidth + padding * 2, 16);
+                        ctx.strokeRect(x - textWidth/2 - padding, y - 8, textWidth + padding * 2, 16);
+                        
+                        // 绘制文本
+                        ctx.fillStyle = '#333';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillText(text, x, y);
+                        ctx.restore();
+                    }
+                });
+            }
         }],
         options: {
             responsive: true,
@@ -337,8 +625,9 @@ function displayMarketShare(marketShare) {
             plugins: {
                 title: {
                     display: true,
-                    text: `组${currentGroup} - 市场份额分布 (${currentPeriod}期间)`,
-                    font: { size: 16, weight: 'bold' }
+                    text: `组${currentGroup} - 市场份额分布 (${currentPeriod}期间${currentPeriod === '4' ? ' - 预测数据' : ''})`,
+                    font: { size: 16, weight: 'bold' },
+                    color: currentPeriod === '4' ? '#8B5CF6' : '#333'
                 },
                 legend: {
                     display: true,
@@ -491,6 +780,30 @@ function displayProductComparison(marketShare) {
                 borderWidth: 2
             }]
         },
+        plugins: [{
+            id: 'barValueLabels',
+            afterDraw: function(chart) {
+                const ctx = chart.ctx;
+                const meta = chart.getDatasetMeta(0);
+                
+                meta.data.forEach((element, index) => {
+                    const value = chart.data.datasets[0].data[index];
+                    if (value > 0) {
+                        ctx.save();
+                        ctx.fillStyle = '#333';
+                        ctx.font = 'bold 12px Arial';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'bottom';
+                        
+                        // 在柱子顶部显示数值
+                        const x = element.x;
+                        const y = element.y - 5;
+                        ctx.fillText(`${value}%`, x, y);
+                        ctx.restore();
+                    }
+                });
+            }
+        }],
         options: {
             responsive: true,
             maintainAspectRatio: false,
@@ -498,8 +811,9 @@ function displayProductComparison(marketShare) {
             plugins: {
                 title: {
                     display: true,
-                    text: `${currentProduct} - 各组市场份额对比 (${currentPeriod}期间)`,
-                    font: { size: 16, weight: 'bold' }
+                    text: `${currentProduct} - 各组市场份额对比 (${currentPeriod}期间${currentPeriod === '4' ? ' - 预测数据' : ''})`,
+                    font: { size: 16, weight: 'bold' },
+                    color: currentPeriod === '4' ? '#8B5CF6' : '#333'
                 },
                 legend: {
                     display: false
@@ -607,6 +921,47 @@ function displayCoordinateCharts(marketIdealValues) {
         coordinateCharts[market] = new Chart(ctx, {
             type: 'scatter',
             data: { datasets },
+            plugins: [{
+                id: 'coordinateValueLabels',
+                afterDraw: function(chart) {
+                    const ctx = chart.ctx;
+                    const datasets = chart.data.datasets;
+                    
+                    datasets.forEach((dataset, datasetIndex) => {
+                        const meta = chart.getDatasetMeta(datasetIndex);
+                        
+                        dataset.data.forEach((point, index) => {
+                            const element = meta.data[index];
+                            if (element && !element.hidden) {
+                                ctx.save();
+                                ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+                                ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
+                                ctx.lineWidth = 1;
+                                ctx.font = 'bold 10px Arial';
+                                
+                                const text = `(${point.x}, ${point.y})`;
+                                const textWidth = ctx.measureText(text).width;
+                                const padding = 3;
+                                
+                                // 标签位置（在点的右上方）
+                                const x = element.x + 8;
+                                const y = element.y - 8;
+                                
+                                // 绘制背景矩形
+                                ctx.fillRect(x, y - 10, textWidth + padding * 2, 14);
+                                ctx.strokeRect(x, y - 10, textWidth + padding * 2, 14);
+                                
+                                // 绘制文本
+                                ctx.fillStyle = '#333';
+                                ctx.textAlign = 'left';
+                                ctx.textBaseline = 'middle';
+                                ctx.fillText(text, x + padding, y - 3);
+                                ctx.restore();
+                            }
+                        });
+                    });
+                }
+            }],
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
@@ -798,7 +1153,7 @@ function showTrend(indicator, type) {
     title.textContent = `${indicator} - 趋势分析`;
     
     // 准备趋势数据
-    const periods = ['1A', '1B', '2', '3'];
+    const periods = ['1A', '1B', '2', '3', '4'];
     let allTrendData = [];
 
     if (type === 'industry') {
@@ -929,22 +1284,98 @@ function createTrendChart(trendData, allTrendData = null, indicator = '', type =
         '#FF9F40', '#FF6384', '#C9CBCF', '#4BC0C0'
     ];
 
-    const datasets = trendData.map((item, index) => ({
-        label: item.product,
-        data: item.data,
-        borderColor: colors[index % colors.length],
-        backgroundColor: colors[index % colors.length] + '20',
-        tension: 0.4,
-        fill: false,
-        pointRadius: 6,
-        pointHoverRadius: 8,
-        borderWidth: 3,
-        hidden: mode === 'hide-all' // 如果是隐藏全部模式，设置为隐藏
-    }));
+    const datasets = trendData.map((item, index) => {
+        // 分离预测数据点
+        const historicalData = item.data.filter(point => point.x !== '4');
+        const predictionData = item.data.filter(point => point.x === '4');
+        
+        const baseColor = colors[index % colors.length];
+        const datasets = [];
+        
+        // 历史数据线
+        if (historicalData.length > 0) {
+            datasets.push({
+                label: item.product,
+                data: historicalData,
+                borderColor: baseColor,
+                backgroundColor: baseColor + '20',
+                tension: 0.4,
+                fill: false,
+                pointRadius: 6,
+                pointHoverRadius: 8,
+                borderWidth: 3,
+                hidden: mode === 'hide-all'
+            });
+        }
+        
+        // 预测数据点（如果存在）
+        if (predictionData.length > 0) {
+            datasets.push({
+                label: `${item.product} (预测)`,
+                data: predictionData,
+                borderColor: '#8B5CF6',
+                backgroundColor: '#8B5CF6',
+                tension: 0,
+                fill: false,
+                pointRadius: 8,
+                pointHoverRadius: 10,
+                borderWidth: 2,
+                borderDash: [10, 5],
+                pointStyle: 'triangle',
+                hidden: mode === 'hide-all',
+                showLine: false // 只显示点，不连线
+            });
+        }
+        
+        return datasets;
+    }).flat();
 
     trendChart = new Chart(ctx, {
         type: 'line',
         data: { datasets },
+        plugins: [{
+            id: 'trendValueLabels',
+            afterDraw: function(chart) {
+                const ctx = chart.ctx;
+                const datasets = chart.data.datasets;
+                
+                datasets.forEach((dataset, datasetIndex) => {
+                    const meta = chart.getDatasetMeta(datasetIndex);
+                    
+                    if (!meta.hidden && dataset.data && dataset.data.length > 0) {
+                        dataset.data.forEach((point, index) => {
+                            const element = meta.data[index];
+                            if (element && !element.hidden) {
+                                ctx.save();
+                                ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+                                ctx.strokeStyle = dataset.borderColor || '#333';
+                                ctx.lineWidth = 1;
+                                ctx.font = 'bold 10px Arial';
+                                
+                                const value = formatValue(point.y);
+                                const textWidth = ctx.measureText(value).width;
+                                const padding = 3;
+                                
+                                // 标签位置（在点的上方）
+                                const x = element.x;
+                                const y = element.y - 15;
+                                
+                                // 绘制背景矩形
+                                ctx.fillRect(x - textWidth/2 - padding, y - 8, textWidth + padding * 2, 12);
+                                ctx.strokeRect(x - textWidth/2 - padding, y - 8, textWidth + padding * 2, 12);
+                                
+                                // 绘制文本
+                                ctx.fillStyle = '#333';
+                                ctx.textAlign = 'center';
+                                ctx.textBaseline = 'middle';
+                                ctx.fillText(value, x, y - 2);
+                                ctx.restore();
+                            }
+                        });
+                    }
+                });
+            }
+        }],
         options: {
             responsive: true,
             maintainAspectRatio: false,
@@ -1029,6 +1460,14 @@ function closeTrendModal() {
     if (trendChart) {
         trendChart.destroy();
         trendChart = null;
+    }
+}
+
+// 关闭预测算法说明模态框
+function closePredictionInfoModal() {
+    const modal = document.getElementById('prediction-info-modal');
+    if (modal) {
+        modal.classList.add('hidden');
     }
 }
 

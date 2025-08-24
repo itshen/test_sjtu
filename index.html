@@ -27,6 +27,31 @@
             text-decoration: line-through;
             opacity: 0.5;
         }
+        
+        /* 预测数据样式 */
+        .prediction-data {
+            font-style: italic;
+            font-weight: bold;
+            color: #8B5CF6;
+            position: relative;
+        }
+        
+        .prediction-data::after {
+            content: " (预测)";
+            font-size: 0.8em;
+            color: #6366F1;
+            font-weight: normal;
+        }
+        
+        .prediction-btn {
+            background: linear-gradient(45deg, #8B5CF6, #6366F1);
+            animation: pulse-prediction 2s infinite;
+        }
+        
+        @keyframes pulse-prediction {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.8; }
+        }
         .coordinate-point {
             cursor: pointer;
             transition: all 0.3s ease;
@@ -64,9 +89,9 @@
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen">
-    <div class="container mx-auto px-3 py-4">
         <!-- 标题和时间选择器 -->
-        <div class="bg-white rounded-lg shadow-md p-4 mb-4">
+        <div class="fixed top-0 left-0 right-0 bg-white shadow-md z-50 border-b">
+            <div class="container mx-auto px-3 py-4">
             <div class="flex flex-wrap items-center justify-between gap-4">
                 <h1 class="text-2xl font-bold text-gray-800">市场数据可视化分析平台</h1>
                 <div class="flex items-center gap-3">
@@ -76,7 +101,7 @@
                         <button class="period-btn bg-gray-300 text-gray-700 px-3 py-1.5 rounded text-sm hover:bg-gray-400 transition-colors" data-period="1B">1B</button>
                         <button class="period-btn bg-gray-300 text-gray-700 px-3 py-1.5 rounded text-sm hover:bg-gray-400 transition-colors" data-period="2">2</button>
                         <button class="period-btn bg-gray-300 text-gray-700 px-3 py-1.5 rounded text-sm hover:bg-gray-400 transition-colors" data-period="3">3</button>
-                        <button class="period-btn bg-gray-300 text-gray-700 px-3 py-1.5 rounded text-sm opacity-50 cursor-not-allowed" data-period="4" disabled>4</button>
+                        <button class="period-btn prediction-btn bg-purple-500 text-white px-3 py-1.5 rounded text-sm hover:bg-purple-600 transition-colors border-2 border-dashed font-bold" data-period="4">4(预测)</button>
                         <button class="period-btn bg-gray-300 text-gray-700 px-3 py-1.5 rounded text-sm opacity-50 cursor-not-allowed" data-period="5" disabled>5</button>
                         <button class="period-btn bg-gray-300 text-gray-700 px-3 py-1.5 rounded text-sm opacity-50 cursor-not-allowed" data-period="6" disabled>6</button>
                     </div>
@@ -86,11 +111,19 @@
                     </label>
                 </div>
             </div>
+            </div>
         </div>
 
+        <!-- 主要内容区域 -->
+        <div class="container mx-auto px-3 py-4 pt-24">
         <!-- 行业数据表格 -->
         <div class="bg-white rounded-lg shadow-md p-4 mb-4">
-            <h2 class="text-xl font-bold text-gray-800 mb-3">整个行业数据</h2>
+            <div class="flex items-center justify-between mb-3">
+                <h2 class="text-xl font-bold text-gray-800">整个行业数据</h2>
+                <button id="industry-prediction-info-btn" class="bg-indigo-500 text-white px-3 py-1 rounded text-xs hover:bg-indigo-600 transition-colors prediction-info-trigger hidden" title="查看预测算法说明">
+                    📊 算法说明
+                </button>
+            </div>
             <div class="overflow-x-auto">
                 <table class="w-full table-auto border-collapse">
                     <thead>
@@ -116,7 +149,12 @@
 
         <!-- 市场份额表格 -->
         <div class="bg-white rounded-lg shadow-md p-4 mb-4">
-            <h2 class="text-xl font-bold text-gray-800 mb-3">市场份额</h2>
+            <div class="flex items-center justify-between mb-3">
+                <h2 class="text-xl font-bold text-gray-800">市场份额</h2>
+                <button id="market-share-prediction-info-btn" class="bg-indigo-500 text-white px-3 py-1 rounded text-xs hover:bg-indigo-600 transition-colors prediction-info-trigger hidden" title="查看预测算法说明">
+                    📊 算法说明
+                </button>
+            </div>
             <div class="overflow-x-auto">
                 <table class="w-full table-auto border-collapse">
                     <thead>
@@ -281,8 +319,111 @@
         </div>
     </div>
 
+    <!-- 预测算法说明模态框 -->
+    <div id="prediction-info-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden">
+        <div class="flex items-center justify-center min-h-screen p-4">
+            <div class="bg-white rounded-lg w-full max-w-5xl max-h-[90vh] overflow-auto">
+                <div class="p-6 border-b">
+                    <div class="flex justify-between items-center">
+                        <h2 class="text-xl font-bold text-gray-800">🔮 预测算法说明</h2>
+                        <button id="close-prediction-modal" class="text-gray-500 hover:text-gray-700">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="p-6">
+                    <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6">
+                        <div class="flex">
+                            <div class="flex-shrink-0">
+                                <svg class="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                                </svg>
+                            </div>
+                            <div class="ml-3">
+                                <p class="text-sm text-yellow-700">
+                                    <strong>重要提示：</strong>历史数据预测仅供参考，实际结果可能因市场变化、政策调整等因素而有所不同。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="grid md:grid-cols-2 gap-6">
+                        <div class="space-y-4">
+                            <h3 class="text-lg font-semibold text-gray-800 border-b pb-2">📊 预测方法概览</h3>
+                            <div class="bg-gray-50 rounded-lg p-4">
+                                <h4 class="font-medium text-purple-700 mb-2">数据窗口</h4>
+                                <p class="text-sm text-gray-600">使用 <strong>Round 2 和 Round 3</strong> 的历史数据进行预测</p>
+                            </div>
+                            <div class="bg-gray-50 rounded-lg p-4">
+                                <h4 class="font-medium text-purple-700 mb-2">预测目标</h4>
+                                <p class="text-sm text-gray-600">生成 <strong>Round 4</strong> 的预测数值</p>
+                            </div>
+                        </div>
+
+                        <div class="space-y-4">
+                            <h3 class="text-lg font-semibold text-gray-800 border-b pb-2">🎯 分类预测逻辑</h3>
+                            
+                            <div class="bg-blue-50 rounded-lg p-4">
+                                <h4 class="font-medium text-blue-700 mb-2">📈 订单数据</h4>
+                                <p class="text-sm text-gray-600 mb-2"><strong>方法：</strong>线性回归 + 增长率校正</p>
+                                <p class="text-sm text-gray-600"><strong>特点：</strong>考虑业务增长趋势，确保预测值合理</p>
+                            </div>
+
+                            <div class="bg-green-50 rounded-lg p-4">
+                                <h4 class="font-medium text-green-700 mb-2">💰 收入数据</h4>
+                                <p class="text-sm text-gray-600 mb-2"><strong>方法：</strong>平均增长率预测</p>
+                                <p class="text-sm text-gray-600"><strong>特点：</strong>基于历史增长率计算未来收入</p>
+                            </div>
+
+                            <div class="bg-orange-50 rounded-lg p-4">
+                                <h4 class="font-medium text-orange-700 mb-2">📊 比率数据</h4>
+                                <p class="text-sm text-gray-600 mb-2"><strong>方法：</strong>加权平均 + 趋势调整</p>
+                                <p class="text-sm text-gray-600"><strong>特点：</strong>重视最近数据，适合毛利率、市场份额等</p>
+                            </div>
+
+                            <div class="bg-red-50 rounded-lg p-4">
+                                <h4 class="font-medium text-red-700 mb-2">💸 成本数据</h4>
+                                <p class="text-sm text-gray-600 mb-2"><strong>方法：</strong>线性回归 + 通胀保护</p>
+                                <p class="text-sm text-gray-600"><strong>特点：</strong>考虑成本上升趋势，设置最小增长率</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-6 bg-indigo-50 rounded-lg p-4">
+                        <h3 class="text-lg font-semibold text-indigo-800 mb-3">🧮 核心算法</h3>
+                        <div class="grid md:grid-cols-2 gap-4">
+                            <div>
+                                <h4 class="font-medium text-indigo-700 mb-2">线性回归公式</h4>
+                                <div class="bg-white rounded p-3 font-mono text-sm">
+                                    y = ax + b<br/>
+                                    <span class="text-gray-600">其中 a = 斜率, b = 截距</span>
+                                </div>
+                            </div>
+                            <div>
+                                <h4 class="font-medium text-indigo-700 mb-2">加权平均公式</h4>
+                                <div class="bg-white rounded p-3 font-mono text-sm">
+                                    加权平均 = Σ(值ᵢ × 权重ᵢ) / Σ权重ᵢ<br/>
+                                    <span class="text-gray-600">最近数据权重更大</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-6 text-center">
+                        <button id="close-prediction-modal-btn" class="bg-purple-500 hover:bg-purple-600 text-white px-6 py-2 rounded-lg transition-colors">
+                            明白了
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+        </div>
+
     <!-- 会话状态显示 -->
-    <div id="session-info" class="fixed top-4 left-4 bg-white rounded-lg shadow-md px-4 py-2 text-sm border hidden">
+    <div id="session-info" class="fixed top-20 left-4 bg-white rounded-lg shadow-md px-4 py-2 text-sm border hidden z-40">
         <div class="flex items-center gap-2">
             <span class="w-2 h-2 bg-green-500 rounded-full"></span>
             <span id="session-timer">--</span>

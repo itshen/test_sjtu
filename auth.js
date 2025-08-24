@@ -7,13 +7,14 @@ class AuthSystem {
         this.sessionKey = 'sjtu_auth_session';
     }
 
-    // 生成基于时间的密码
-    generateTimeBasedPassword(seed) {
+    // 生成基于时间的密码（所有人在同一分钟内密码相同）
+    generateTimeBasedPassword() {
         const now = new Date();
         const timeSlot = Math.floor(now.getTime() / (this.passwordValidity * 60 * 1000));
         
-        // 使用简单的哈希算法生成密码
-        const combined = seed + timeSlot.toString();
+        // 使用固定种子，确保所有人在同一时间片内获得相同密码
+        const fixedSeed = 'SJTU_SYSTEM_2024';
+        const combined = fixedSeed + timeSlot.toString();
         let hash = 0;
         for (let i = 0; i < combined.length; i++) {
             const char = combined.charCodeAt(i);
@@ -28,7 +29,7 @@ class AuthSystem {
 
     // 验证访问密码
     validateAccessPassword(inputPassword) {
-        const validPassword = this.generateTimeBasedPassword(this.adminPassword);
+        const validPassword = this.generateTimeBasedPassword();
         return inputPassword === validPassword;
     }
 
