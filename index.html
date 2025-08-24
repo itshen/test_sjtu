@@ -23,6 +23,10 @@
         .trend-neutral {
             color: #6b7280;
         }
+        .legend-item-hidden {
+            text-decoration: line-through;
+            opacity: 0.5;
+        }
         .coordinate-point {
             cursor: pointer;
             transition: all 0.3s ease;
@@ -110,21 +114,80 @@
             </div>
         </div>
 
-        <!-- 市场份额饼图 -->
+        <!-- 市场份额表格 -->
         <div class="bg-white rounded-lg shadow-md p-4 mb-4">
-            <h2 class="text-xl font-bold text-gray-800 mb-3">市场份额分布</h2>
-            <div class="mb-4">
-                <label class="text-sm font-medium text-gray-700 mr-4">选择组别:</label>
-                <div class="inline-flex gap-2">
-                    <button class="group-btn bg-blue-500 text-white px-3 py-1.5 rounded text-sm hover:bg-blue-600 transition-colors" data-group="1">组1</button>
-                    <button class="group-btn bg-gray-300 text-gray-700 px-3 py-1.5 rounded text-sm hover:bg-gray-400 transition-colors" data-group="2">组2</button>
-                    <button class="group-btn bg-gray-300 text-gray-700 px-3 py-1.5 rounded text-sm hover:bg-gray-400 transition-colors" data-group="3">组3</button>
-                    <button class="group-btn bg-gray-300 text-gray-700 px-3 py-1.5 rounded text-sm hover:bg-gray-400 transition-colors" data-group="4">组4</button>
-                    <button class="group-btn bg-gray-300 text-gray-700 px-3 py-1.5 rounded text-sm hover:bg-gray-400 transition-colors" data-group="5">组5</button>
+            <h2 class="text-xl font-bold text-gray-800 mb-3">市场份额</h2>
+            <div class="overflow-x-auto">
+                <table class="w-full table-auto border-collapse">
+                    <thead>
+                        <tr class="bg-gray-50">
+                            <th class="border border-gray-300 px-4 py-2 text-left">组序</th>
+                            <th class="border border-gray-300 px-4 py-2 text-center">尤菲亚P1</th>
+                            <th class="border border-gray-300 px-4 py-2 text-center">尤菲亚P2</th>
+                            <th class="border border-gray-300 px-4 py-2 text-center">尤菲亚P3</th>
+                            <th class="border border-gray-300 px-4 py-2 text-center">纳达卡P1</th>
+                            <th class="border border-gray-300 px-4 py-2 text-center">纳达卡P2</th>
+                            <th class="border border-gray-300 px-4 py-2 text-center">纳达卡P3</th>
+                            <th class="border border-gray-300 px-4 py-2 text-center">尼赫鲁P1</th>
+                            <th class="border border-gray-300 px-4 py-2 text-center">尼赫鲁P2</th>
+                            <th class="border border-gray-300 px-4 py-2 text-center">尼赫鲁P3</th>
+                        </tr>
+                    </thead>
+                    <tbody id="market-share-tbody">
+                        <!-- 动态生成 -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- 市场份额分析 -->
+        <div class="bg-white rounded-lg shadow-md p-4 mb-4">
+            <h2 class="text-xl font-bold text-gray-800 mb-3">市场份额分析</h2>
+            
+            <!-- 视图切换 -->
+            <div class="mb-4 border-b">
+                <div class="flex gap-4 mb-3">
+                    <button class="view-btn bg-blue-500 text-white px-4 py-2 rounded-t text-sm font-medium border-b-2 border-blue-500" data-view="by-group">按组别查看</button>
+                    <button class="view-btn bg-gray-100 text-gray-700 px-4 py-2 rounded-t text-sm font-medium hover:bg-gray-200 transition-colors" data-view="by-product">按产品对比</button>
                 </div>
             </div>
-            <div class="chart-container h-96">
-                <canvas id="market-share-chart"></canvas>
+
+            <!-- 按组别查看视图 -->
+            <div id="group-view" class="view-content">
+                <div class="mb-4">
+                    <label class="text-sm font-medium text-gray-700 mr-4">选择组别:</label>
+                    <div class="inline-flex gap-2">
+                        <button class="group-btn bg-blue-500 text-white px-3 py-1.5 rounded text-sm hover:bg-blue-600 transition-colors" data-group="1">组1</button>
+                        <button class="group-btn bg-gray-300 text-gray-700 px-3 py-1.5 rounded text-sm hover:bg-gray-400 transition-colors" data-group="2">组2</button>
+                        <button class="group-btn bg-gray-300 text-gray-700 px-3 py-1.5 rounded text-sm hover:bg-gray-400 transition-colors" data-group="3">组3</button>
+                        <button class="group-btn bg-gray-300 text-gray-700 px-3 py-1.5 rounded text-sm hover:bg-gray-400 transition-colors" data-group="4">组4</button>
+                        <button class="group-btn bg-gray-300 text-gray-700 px-3 py-1.5 rounded text-sm hover:bg-gray-400 transition-colors" data-group="5">组5</button>
+                    </div>
+                </div>
+                <div class="chart-container h-96">
+                    <canvas id="market-share-chart"></canvas>
+                </div>
+            </div>
+
+            <!-- 按产品对比视图 -->
+            <div id="product-view" class="view-content hidden">
+                <div class="mb-4">
+                    <label class="text-sm font-medium text-gray-700 mr-4">选择产品:</label>
+                    <div class="inline-flex gap-2 flex-wrap">
+                        <button class="product-btn bg-blue-500 text-white px-3 py-1.5 rounded text-sm hover:bg-blue-600 transition-colors" data-product="尤菲亚P1">尤菲亚P1</button>
+                        <button class="product-btn bg-gray-300 text-gray-700 px-3 py-1.5 rounded text-sm hover:bg-gray-400 transition-colors" data-product="尤菲亚P2">尤菲亚P2</button>
+                        <button class="product-btn bg-gray-300 text-gray-700 px-3 py-1.5 rounded text-sm hover:bg-gray-400 transition-colors" data-product="尤菲亚P3">尤菲亚P3</button>
+                        <button class="product-btn bg-gray-300 text-gray-700 px-3 py-1.5 rounded text-sm hover:bg-gray-400 transition-colors" data-product="纳达卡P1">纳达卡P1</button>
+                        <button class="product-btn bg-gray-300 text-gray-700 px-3 py-1.5 rounded text-sm hover:bg-gray-400 transition-colors" data-product="纳达卡P2">纳达卡P2</button>
+                        <button class="product-btn bg-gray-300 text-gray-700 px-3 py-1.5 rounded text-sm hover:bg-gray-400 transition-colors" data-product="纳达卡P3">纳达卡P3</button>
+                        <button class="product-btn bg-gray-300 text-gray-700 px-3 py-1.5 rounded text-sm hover:bg-gray-400 transition-colors" data-product="尼赫鲁P1">尼赫鲁P1</button>
+                        <button class="product-btn bg-gray-300 text-gray-700 px-3 py-1.5 rounded text-sm hover:bg-gray-400 transition-colors" data-product="尼赫鲁P2">尼赫鲁P2</button>
+                        <button class="product-btn bg-gray-300 text-gray-700 px-3 py-1.5 rounded text-sm hover:bg-gray-400 transition-colors" data-product="尼赫鲁P3">尼赫鲁P3</button>
+                    </div>
+                </div>
+                <div class="chart-container h-96">
+                    <canvas id="product-comparison-chart"></canvas>
+                </div>
             </div>
         </div>
 

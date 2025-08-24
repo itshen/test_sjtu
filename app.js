@@ -3,9 +3,13 @@ let currentPeriod = '1A';
 let allData = {};
 let coordinateCharts = {};
 let marketShareChart = null;
+let productComparisonChart = null;
 let trendChart = null;
 let showComparison = false;
 let currentGroup = '1';
+let currentProduct = '尤菲亚P1';
+let currentView = 'by-group';
+let marketShareHiddenItems = {}; // 记录每个组的隐藏状态
 
 // 期间顺序定义
 const periodOrder = ['1A', '1B', '2', '3'];
@@ -71,6 +75,23 @@ function initEventListeners() {
         displayData(currentPeriod);
     });
 
+    // 视图切换
+    document.querySelectorAll('.view-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            // 更新按钮样式
+            document.querySelectorAll('.view-btn').forEach(b => {
+                b.classList.remove('bg-blue-500', 'text-white', 'border-b-2', 'border-blue-500');
+                b.classList.add('bg-gray-100', 'text-gray-700');
+            });
+            this.classList.remove('bg-gray-100', 'text-gray-700');
+            this.classList.add('bg-blue-500', 'text-white', 'border-b-2', 'border-blue-500');
+            
+            // 切换视图
+            currentView = this.dataset.view;
+            switchView();
+        });
+    });
+
     // 组别选择器
     document.querySelectorAll('.group-btn').forEach(btn => {
         btn.addEventListener('click', function() {
@@ -85,6 +106,23 @@ function initEventListeners() {
             // 更新当前组别并显示数据
             currentGroup = this.dataset.group;
             displayMarketShare(allData[currentPeriod].marketShare);
+        });
+    });
+
+    // 产品选择器
+    document.querySelectorAll('.product-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            // 更新按钮样式
+            document.querySelectorAll('.product-btn').forEach(b => {
+                b.classList.remove('bg-blue-500', 'text-white');
+                b.classList.add('bg-gray-300', 'text-gray-700');
+            });
+            this.classList.remove('bg-gray-300', 'text-gray-700');
+            this.classList.add('bg-blue-500', 'text-white');
+            
+            // 更新当前产品并显示数据
+            currentProduct = this.dataset.product;
+            displayProductComparison(allData[currentPeriod].marketShare);
         });
     });
 
@@ -134,7 +172,15 @@ function displayData(period) {
 
     const data = allData[period];
     displayIndustryData(data.industryData);
-    displayMarketShare(data.marketShare);
+    displayMarketShareTable(data.marketShare);
+    
+    // 根据当前视图显示对应的图表
+    if (currentView === 'by-group') {
+        displayMarketShare(data.marketShare);
+    } else {
+        displayProductComparison(data.marketShare);
+    }
+    
     displayCoordinateCharts(data.marketIdealValues);
 }
 
@@ -178,6 +224,46 @@ function displayIndustryData(industryData) {
     });
 }
 
+// 显示市场份额表格
+function displayMarketShareTable(marketShare) {
+    const tbody = document.getElementById('market-share-tbody');
+    tbody.innerHTML = '';
+
+    // 获取上一个期间的数据用于环比
+    const prevPeriod = getPreviousPeriod(currentPeriod);
+    const prevData = prevPeriod ? allData[prevPeriod]?.marketShare : null;
+
+    Object.keys(marketShare).forEach(group => {
+        const row = document.createElement('tr');
+        const cells = Object.keys(marketShare[group]).map(product => {
+            const currentValue = marketShare[group][product];
+            const prevValue = prevData ? prevData[group]?.[product] : null;
+            
+            let cellContent = `${currentValue}%`;
+            
+            if (showComparison && prevValue !== null && prevValue !== undefined) {
+                const comparison = calculateComparison(currentValue, prevValue);
+                if (comparison.change !== 0) {
+                    cellContent += `<br><span class="comparison-value ${comparison.className}">
+                        ${comparison.changeText}
+                    </span>`;
+                }
+            }
+            
+            return `<td class="border border-gray-300 px-3 py-2 text-center text-sm">${cellContent}</td>`;
+        }).join('');
+
+        row.innerHTML = `
+            <td class="border border-gray-300 px-3 py-2 font-medium cursor-pointer hover:bg-blue-50 transition-colors text-sm" 
+                onclick="showTrend('组${group}', 'marketShare')" title="点击查看趋势">
+                组 ${group} 📈
+            </td>
+            ${cells}
+        `;
+        tbody.appendChild(row);
+    });
+}
+
 // 显示市场份额饼图
 function displayMarketShare(marketShare) {
     const ctx = document.getElementById('market-share-chart');
@@ -205,6 +291,10 @@ function displayMarketShare(marketShare) {
         data.push(groupData[product]);
     });
 
+    // 恢复之前的隐藏状态
+    const groupKey = `group_${currentGroup}`;
+    const hiddenItems = marketShareHiddenItems[groupKey] || [];
+
     // 创建饼图
     marketShareChart = new Chart(ctx, {
         type: 'pie',
@@ -217,6 +307,29 @@ function displayMarketShare(marketShare) {
                 borderWidth: 2
             }]
         },
+        plugins: [{
+            id: 'customLegend',
+            afterDraw: function(chart) {
+                const legend = chart.legend;
+                const ctx = chart.ctx;
+                
+                legend.legendItems.forEach((legendItem, index) => {
+                    if (legendItem.hidden) {
+                        const legendRect = legend.legendHitBoxes[index];
+                        if (legendRect) {
+                            ctx.save();
+                            ctx.strokeStyle = '#999999';
+                            ctx.lineWidth = 2;
+                            ctx.beginPath();
+                            ctx.moveTo(legendRect.left, legendRect.top + legendRect.height / 2);
+                            ctx.lineTo(legendRect.left + legendRect.width, legendRect.top + legendRect.height / 2);
+                            ctx.stroke();
+                            ctx.restore();
+                        }
+                    }
+                });
+            }
+        }],
         options: {
             responsive: true,
             maintainAspectRatio: false,
@@ -224,7 +337,7 @@ function displayMarketShare(marketShare) {
             plugins: {
                 title: {
                     display: true,
-                    text: `组${currentGroup} - 市场份额分布`,
+                    text: `组${currentGroup} - 市场份额分布 (${currentPeriod}期间)`,
                     font: { size: 16, weight: 'bold' }
                 },
                 legend: {
@@ -233,21 +346,63 @@ function displayMarketShare(marketShare) {
                     labels: {
                         padding: 20,
                         font: { size: 12 },
+                        usePointStyle: false,
                         generateLabels: function(chart) {
                             const data = chart.data;
                             if (data.labels.length && data.datasets.length) {
                                 return data.labels.map((label, i) => {
                                     const value = data.datasets[0].data[i];
+                                    const meta = chart.getDatasetMeta(0);
+                                    const hidden = meta.data[i] ? meta.data[i].hidden : false;
+                                    
                                     return {
                                         text: `${label}: ${value}%`,
-                                        fillStyle: data.datasets[0].backgroundColor[i],
-                                        hidden: false,
-                                        index: i
+                                        fillStyle: hidden ? '#cccccc' : data.datasets[0].backgroundColor[i],
+                                        strokeStyle: hidden ? '#999999' : data.datasets[0].backgroundColor[i],
+                                        lineWidth: 2,
+                                        hidden: hidden,
+                                        index: i,
+                                        fontColor: hidden ? '#999999' : '#333333'
                                     };
                                 });
                             }
                             return [];
                         }
+                    },
+                    onClick: function(e, legendItem, legend) {
+                        const index = legendItem.index;
+                        const chart = legend.chart;
+                        const meta = chart.getDatasetMeta(0);
+                        
+                        // 切换数据的可见性
+                        if (meta.data[index]) {
+                            meta.data[index].hidden = !meta.data[index].hidden;
+                            
+                            // 保存隐藏状态
+                            const groupKey = `group_${currentGroup}`;
+                            if (!marketShareHiddenItems[groupKey]) {
+                                marketShareHiddenItems[groupKey] = [];
+                            }
+                            
+                            const productName = chart.data.labels[index];
+                            const hiddenList = marketShareHiddenItems[groupKey];
+                            
+                            if (meta.data[index].hidden) {
+                                // 添加到隐藏列表
+                                if (!hiddenList.includes(productName)) {
+                                    hiddenList.push(productName);
+                                }
+                            } else {
+                                // 从隐藏列表移除
+                                const hiddenIndex = hiddenList.indexOf(productName);
+                                if (hiddenIndex > -1) {
+                                    hiddenList.splice(hiddenIndex, 1);
+                                }
+                            }
+                        }
+                        
+                        // 重新渲染图表和图例
+                        chart.update();
                     }
                 },
                 tooltip: {
@@ -269,6 +424,129 @@ function displayMarketShare(marketShare) {
                     const label = this.data.labels[element.index];
                     // 可以添加点击产品的处理逻辑
                     console.log(`点击了 ${label}`);
+                }
+            }
+        }
+    });
+
+    // 应用之前保存的隐藏状态
+    if (hiddenItems.length > 0) {
+        const meta = marketShareChart.getDatasetMeta(0);
+        labels.forEach((label, index) => {
+            if (hiddenItems.includes(label)) {
+                meta.data[index].hidden = true;
+            }
+        });
+        marketShareChart.update();
+    }
+}
+
+// 视图切换函数
+function switchView() {
+    const groupView = document.getElementById('group-view');
+    const productView = document.getElementById('product-view');
+    
+    if (currentView === 'by-group') {
+        groupView.classList.remove('hidden');
+        productView.classList.add('hidden');
+        displayMarketShare(allData[currentPeriod].marketShare);
+    } else {
+        groupView.classList.add('hidden');
+        productView.classList.remove('hidden');
+        displayProductComparison(allData[currentPeriod].marketShare);
+    }
+}
+
+// 显示产品对比图表
+function displayProductComparison(marketShare) {
+    const ctx = document.getElementById('product-comparison-chart');
+    if (!ctx) return;
+
+    // 销毁之前的图表
+    if (productComparisonChart) {
+        productComparisonChart.destroy();
+    }
+
+    // 准备数据：收集选中产品在各个组的市场份额
+    const labels = ['组1', '组2', '组3', '组4', '组5'];
+    const data = [];
+    const colors = ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF'];
+
+    labels.forEach((label, index) => {
+        const groupNumber = (index + 1).toString();
+        const value = marketShare[groupNumber] ? marketShare[groupNumber][currentProduct] : 0;
+        data.push(value);
+    });
+
+    // 创建柱状图
+    productComparisonChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: `${currentProduct} 市场份额`,
+                data: data,
+                backgroundColor: colors,
+                borderColor: colors.map(color => color + 'CC'),
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: false,
+            plugins: {
+                title: {
+                    display: true,
+                    text: `${currentProduct} - 各组市场份额对比 (${currentPeriod}期间)`,
+                    font: { size: 16, weight: 'bold' }
+                },
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                    titleColor: '#fff',
+                    bodyColor: '#fff',
+                    callbacks: {
+                        title: function(context) {
+                            return `${context[0].label}`;
+                        },
+                        label: function(context) {
+                            return `${currentProduct}: ${context.parsed.y}%`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    title: {
+                        display: true,
+                        text: '组别',
+                        font: { size: 12, weight: 'bold' }
+                    },
+                    grid: {
+                        color: 'rgba(0, 0, 0, 0.1)'
+                    }
+                },
+                y: {
+                    title: {
+                        display: true,
+                        text: '市场份额 (%)',
+                        font: { size: 12, weight: 'bold' }
+                    },
+                    beginAtZero: true,
+                    max: 100,
+                    grid: {
+                        color: 'rgba(0, 0, 0, 0.1)'
+                    }
+                }
+            },
+            onClick: function(event, elements) {
+                if (elements.length > 0) {
+                    const element = elements[0];
+                    const groupIndex = element.index + 1;
+                    console.log(`点击了组${groupIndex}的${currentProduct}`);
                 }
             }
         }
