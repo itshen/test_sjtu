@@ -86,6 +86,29 @@
             align-items: center;
             justify-content: center;
         }
+        
+        /* 费用预测显示样式 */
+        .cost-display {
+            animation: fadeIn 0.3s ease-in-out;
+            border-left: 4px solid #3B82F6;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .coordinate-info-section {
+            border-bottom: 1px solid #E5E7EB;
+            padding-bottom: 4px;
+            margin-bottom: 4px;
+        }
+        
+        .coordinate-info-section:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+            padding-bottom: 0;
+        }
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen">
@@ -231,7 +254,128 @@
 
         <!-- 市场理想值坐标图 -->
         <div class="bg-white rounded-lg shadow-md p-4 mb-4">
-            <h2 class="text-xl font-bold text-gray-800 mb-3">市场理想值 - 扭矩vs电阻坐标图</h2>
+            <div class="flex items-center justify-between mb-3">
+                <h2 class="text-xl font-bold text-gray-800">市场理想值 - 扭矩vs电阻坐标图</h2>
+                <div class="text-sm text-gray-600 bg-blue-50 px-3 py-1 rounded-full border border-blue-200">
+                    💰 将鼠标悬停在坐标图上查看研发预算
+                </div>
+            </div>
+            
+            <!-- 费用计算方法说明 -->
+            <div class="bg-gray-50 rounded-lg p-4 mb-4 border border-gray-200">
+                <div class="flex items-center mb-3">
+                    <h3 class="text-lg font-semibold text-gray-800">📊 费用计算方法</h3>
+                    <button id="toggle-calculation-details" class="ml-2 text-blue-600 text-sm hover:text-blue-800">
+                        [展开详情]
+                    </button>
+                </div>
+                
+                <div class="grid md:grid-cols-2 gap-4">
+                    <div>
+                        <h4 class="font-medium text-gray-700 mb-2">🎯 计算原理</h4>
+                        <div class="text-sm text-gray-600 space-y-1">
+                            <p>• 基于历史研发数据的扭矩和电阻变化成本模型</p>
+                            <p>• 考虑不同产品类型的研发难度系数</p>
+                            <p>• 使用线性插值估算中间值</p>
+                            <p>• 复合参数调整增加复杂性成本</p>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <h4 class="font-medium text-gray-700 mb-2">💡 使用方法</h4>
+                        <div class="text-sm text-gray-600 space-y-1">
+                            <p>• 将鼠标悬停在任意坐标位置</p>
+                            <p>• 查看各产品调整到该位置的预算</p>
+                            <p>• 预算包含最小值、平均值、最大值</p>
+                            <p>• 调整量 = 目标位置 - 当前位置</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 详细计算公式（默认隐藏） -->
+                <div id="calculation-details" class="hidden mt-4 pt-4 border-t border-gray-300">
+                    <div class="grid md:grid-cols-2 gap-6">
+                        <div>
+                            <h4 class="font-medium text-gray-700 mb-3">📈 扭矩变化费用模型</h4>
+                            <div class="bg-white rounded p-3 text-xs">
+                                <table class="w-full text-xs">
+                                    <thead>
+                                        <tr class="border-b">
+                                            <th class="text-left py-1">扭矩变化</th>
+                                            <th class="text-left py-1">最小费用</th>
+                                            <th class="text-left py-1">最大费用</th>
+                                            <th class="text-left py-1">成功率</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="text-gray-600">
+                                        <tr><td>0.7</td><td>$1.1M</td><td>$1.15M</td><td>67%</td></tr>
+                                        <tr><td>1.0</td><td>$0.18M</td><td>$0.40M</td><td>0%</td></tr>
+                                        <tr><td>1.4</td><td>$1.38M</td><td>$1.38M</td><td>100%</td></tr>
+                                        <tr><td>4.0</td><td>$4.0M</td><td>$6.0M</td><td>50%</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <h4 class="font-medium text-gray-700 mb-3">⚡ 电阻变化费用模型</h4>
+                            <div class="bg-white rounded p-3 text-xs">
+                                <table class="w-full text-xs">
+                                    <thead>
+                                        <tr class="border-b">
+                                            <th class="text-left py-1">电阻变化</th>
+                                            <th class="text-left py-1">最小费用</th>
+                                            <th class="text-left py-1">最大费用</th>
+                                            <th class="text-left py-1">成功率</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="text-gray-600">
+                                        <tr><td>0.4</td><td>$0.18M</td><td>$0.40M</td><td>0%</td></tr>
+                                        <tr><td>0.8</td><td>$0.75M</td><td>$0.75M</td><td>0%</td></tr>
+                                        <tr><td>0.9</td><td>$1.10M</td><td>$1.15M</td><td>100%</td></tr>
+                                        <tr><td>1.0</td><td>$1.38M</td><td>$1.38M</td><td>100%</td></tr>
+                                        <tr><td>4.0</td><td>$4.0M</td><td>$6.0M</td><td>50%</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-4 grid md:grid-cols-2 gap-6">
+                        <div>
+                            <h4 class="font-medium text-gray-700 mb-3">🔧 产品类型系数</h4>
+                            <div class="bg-white rounded p-3 text-sm">
+                                <div class="space-y-1 text-gray-600">
+                                    <p>• 雷墨磁1: 0.671 (单位变化成本)</p>
+                                    <p>• 雷墨磁2: 0.734 (单位变化成本)</p>
+                                    <p>• 雷墨磁3: 0.671 (单位变化成本)</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <h4 class="font-medium text-gray-700 mb-3">🧮 计算公式</h4>
+                            <div class="bg-white rounded p-3 text-sm">
+                                <div class="space-y-2 text-gray-600 font-mono text-xs">
+                                    <p>最终费用 = (扭矩费用 + 电阻费用) × 产品系数 × 风险调整</p>
+                                    <p>复杂性调整 = 双参数变化时 × 1.2</p>
+                                    <p>风险调整 = 1 + (1 - 成功率) × 0.5</p>
+                                    <p>插值 = 线性插值已知数据点</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-4 bg-blue-50 rounded p-3 border border-blue-200">
+                        <h4 class="font-medium text-blue-800 mb-2">📚 数据来源</h4>
+                        <div class="text-sm text-blue-700">
+                            <p>基于提供的扭矩和电阻研发历史案例分析，包含成功和失败案例的预算范围、变化量和成功率统计。
+                            算法通过线性回归和加权平均等方法，结合产品类型特征，预测不同参数调整的研发成本。</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
                 <!-- 尤菲亚市场 -->
                 <div class="border rounded-lg p-3">

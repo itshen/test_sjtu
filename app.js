@@ -124,6 +124,119 @@ function predictCostData(historicalValues) {
     return Math.round(prediction * 100) / 100;
 }
 
+// 研发费用计算算法 - 基于扭矩和电阻变化
+function calculateRDCost(torqueChange, resistanceChange, productType = '雷墨磁1/3') {
+    // 基于分析数据的费用预测模型
+    
+    // 扭矩变化费用模型（百万美元）
+    const torqueCostModel = {
+        0.7: { min: 1.1, max: 1.15, successRate: 0.67 },
+        1.0: { min: 0.18, max: 0.40, successRate: 0.0 },
+        1.4: { min: 1.38, max: 1.38, successRate: 1.0 },
+        4.0: { min: 4.0, max: 6.0, successRate: 0.5 }
+    };
+    
+    // 电阻变化费用模型（百万美元）
+    const resistanceCostModel = {
+        0.4: { min: 0.18, max: 0.40, successRate: 0.0 },
+        0.8: { min: 0.75, max: 0.75, successRate: 0.0 },
+        0.9: { min: 1.10, max: 1.15, successRate: 1.0 },
+        1.0: { min: 1.38, max: 1.38, successRate: 1.0 },
+        4.0: { min: 4.0, max: 6.0, successRate: 0.5 }
+    };
+    
+    // 产品类型系数
+    const productMultiplier = {
+        '雷墨磁1': 0.671,  // 单位变化成本
+        '雷墨磁2': 0.734,
+        '雷墨磁3': 0.671,
+        '雷墨磁1/3': 0.671
+    };
+    
+    // 插值函数 - 根据已知数据点估算
+    function interpolateCost(change, model) {
+        const keys = Object.keys(model).map(k => parseFloat(k)).sort((a, b) => a - b);
+        
+        // 如果变化值在已知范围内，进行插值
+        if (change <= keys[0]) {
+            const data = model[keys[0]];
+            return {
+                minCost: data.min,
+                maxCost: data.max,
+                avgCost: (data.min + data.max) / 2,
+                successRate: data.successRate
+            };
+        }
+        
+        if (change >= keys[keys.length - 1]) {
+            const data = model[keys[keys.length - 1]];
+            // 对于超出范围的大变化，按比例增加成本
+            const multiplier = change / keys[keys.length - 1];
+            return {
+                minCost: data.min * multiplier,
+                maxCost: data.max * multiplier,
+                avgCost: (data.min + data.max) / 2 * multiplier,
+                successRate: Math.max(0.1, data.successRate - 0.1 * (multiplier - 1))
+            };
+        }
+        
+        // 线性插值
+        for (let i = 0; i < keys.length - 1; i++) {
+            if (change >= keys[i] && change <= keys[i + 1]) {
+                const ratio = (change - keys[i]) / (keys[i + 1] - keys[i]);
+                const data1 = model[keys[i]];
+                const data2 = model[keys[i + 1]];
+                
+                return {
+                    minCost: data1.min + (data2.min - data1.min) * ratio,
+                    maxCost: data1.max + (data2.max - data1.max) * ratio,
+                    avgCost: (data1.min + data1.max) / 2 + ((data2.min + data2.max) / 2 - (data1.min + data1.max) / 2) * ratio,
+                    successRate: data1.successRate + (data2.successRate - data1.successRate) * ratio
+                };
+            }
+        }
+        
+        // 默认返回
+        return { minCost: 0.5, maxCost: 2.0, avgCost: 1.25, successRate: 0.3 };
+    }
+    
+    // 计算扭矩和电阻的费用
+    const torqueCost = interpolateCost(Math.abs(torqueChange), torqueCostModel);
+    const resistanceCost = interpolateCost(Math.abs(resistanceChange), resistanceCostModel);
+    
+    // 组合费用 - 考虑协同效应
+    let combinedMinCost = torqueCost.minCost + resistanceCost.minCost;
+    let combinedMaxCost = torqueCost.maxCost + resistanceCost.maxCost;
+    let combinedAvgCost = torqueCost.avgCost + resistanceCost.avgCost;
+    
+    // 如果两个参数都有变化，增加复杂性成本
+    if (Math.abs(torqueChange) > 0.1 && Math.abs(resistanceChange) > 0.1) {
+        const complexityMultiplier = 1.2;
+        combinedMinCost *= complexityMultiplier;
+        combinedMaxCost *= complexityMultiplier;
+        combinedAvgCost *= complexityMultiplier;
+    }
+    
+    // 应用产品类型系数
+    const multiplier = productMultiplier[productType] || productMultiplier['雷墨磁1/3'];
+    
+    // 综合成功率 - 取较低者（风险较高）
+    const combinedSuccessRate = Math.min(torqueCost.successRate, resistanceCost.successRate);
+    
+    // 风险调整 - 成功率低的项目需要更多预算
+    const riskMultiplier = 1 + (1 - combinedSuccessRate) * 0.5;
+    
+    return {
+        minCost: Math.round(combinedMinCost * multiplier * riskMultiplier * 100) / 100,
+        maxCost: Math.round(combinedMaxCost * multiplier * riskMultiplier * 100) / 100,
+        avgCost: Math.round(combinedAvgCost * multiplier * riskMultiplier * 100) / 100,
+        successRate: Math.round(combinedSuccessRate * 100),
+        torqueChange: Math.abs(torqueChange),
+        resistanceChange: Math.abs(resistanceChange),
+        riskLevel: combinedSuccessRate > 0.7 ? '低风险' : combinedSuccessRate > 0.4 ? '中风险' : '高风险'
+    };
+}
+
 // 智能预测函数，根据数据类型选择合适的预测方法
 function predictValueByType(historicalValues, dataType) {
     switch (dataType) {
@@ -322,6 +435,22 @@ function initEventListeners() {
             displayProductComparison(allData[currentPeriod].marketShare);
         });
     });
+
+    // 费用计算详情展开/收起
+    const toggleButton = document.getElementById('toggle-calculation-details');
+    const detailsDiv = document.getElementById('calculation-details');
+    
+    if (toggleButton && detailsDiv) {
+        toggleButton.addEventListener('click', function() {
+            if (detailsDiv.classList.contains('hidden')) {
+                detailsDiv.classList.remove('hidden');
+                toggleButton.textContent = '[收起详情]';
+            } else {
+                detailsDiv.classList.add('hidden');
+                toggleButton.textContent = '[展开详情]';
+            }
+        });
+    }
 
     // 键盘导航
     document.addEventListener('keydown', function(e) {
@@ -1077,7 +1206,7 @@ function displayCoordinateCharts(marketIdealValues) {
                 onHover: function(event, elements) {
                     event.native.target.style.cursor = elements.length > 0 ? 'pointer' : 'crosshair';
                     
-                    // 显示实时坐标
+                    // 显示实时坐标和费用预测
                     const chart = this;
                     const canvasPosition = Chart.helpers.getRelativePosition(event, chart);
                     
@@ -1091,27 +1220,128 @@ function displayCoordinateCharts(marketIdealValues) {
                         coordDisplay = document.createElement('div');
                         coordDisplay.id = `coord-display-${market}`;
                         coordDisplay.style.cssText = `
-                            position: absolute;
-                            top: 10px;
-                            right: 10px;
-                            background: rgba(255, 255, 255, 0.9);
-                            padding: 6px 10px;
-                            border-radius: 4px;
+                            position: fixed;
+                            background: rgba(255, 255, 255, 0.95);
+                            padding: 8px 12px;
+                            border-radius: 6px;
                             font-size: 11px;
                             border: 1px solid #ccc;
                             pointer-events: none;
-                            z-index: 100;
+                            z-index: 1000;
                             font-family: monospace;
+                            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                            max-width: 280px;
+                            min-width: 240px;
+                            display: none;
                         `;
-                        chart.canvas.parentElement.style.position = 'relative';
-                        chart.canvas.parentElement.appendChild(coordDisplay);
+                        document.body.appendChild(coordDisplay);
                     }
                     
+                    // 动态定位浮窗
+                    const rect = chart.canvas.getBoundingClientRect();
+                    const mouseX = event.native.clientX;
+                    const mouseY = event.native.clientY;
+                    
                     if (dataX >= 0 && dataX <= 5 && dataY >= 0 && dataY <= 5) {
+                        const currentTorque = Math.max(0, Math.min(5, dataX));
+                        const currentResistance = Math.max(0, Math.min(5, dataY));
+                        
+                        // 获取当前市场的三个产品圆点位置，计算每个产品到鼠标位置的费用
+                        const currentData = allData[currentPeriod]?.marketIdealValues?.[market];
+                        const productCosts = [];
+                        
+                        if (currentData) {
+                            Object.keys(currentData).forEach(productName => {
+                                const productData = currentData[productName];
+                                if (productData) {
+                                    // 计算从产品当前位置到鼠标位置的偏移量
+                                    const torqueChange = currentTorque - productData.扭矩;
+                                    const resistanceChange = currentResistance - productData.电阻;
+                                    
+                                    // 确定产品类型
+                                    let productType = '雷墨磁1/3';
+                                    if (productName.includes('2')) {
+                                        productType = '雷墨磁2';
+                                    } else if (productName.includes('3')) {
+                                        productType = '雷墨磁3';
+                                    } else {
+                                        productType = '雷墨磁1';
+                                    }
+                                    
+                                    // 计算将该产品从当前位置调整到鼠标位置的费用
+                                    const costEstimate = calculateRDCost(torqueChange, resistanceChange, productType);
+                                    productCosts.push({
+                                        name: productName,
+                                        type: productType,
+                                        currentPosition: `(${productData.扭矩.toFixed(2)}, ${productData.电阻.toFixed(2)})`,
+                                        torqueChange: torqueChange,
+                                        resistanceChange: resistanceChange,
+                                        cost: costEstimate
+                                    });
+                                }
+                            });
+                        }
+                        
+                        // 如果没有产品数据，使用默认计算
+                        if (productCosts.length === 0) {
+                            const torqueChange = currentTorque - 2.5;
+                            const resistanceChange = currentResistance - 2.5;
+                            const costEstimate = calculateRDCost(torqueChange, resistanceChange);
+                            productCosts.push({
+                                name: '默认产品',
+                                type: '雷墨磁1/3',
+                                currentPosition: '(2.50, 2.50)',
+                                torqueChange: torqueChange,
+                                resistanceChange: resistanceChange,
+                                cost: costEstimate
+                            });
+                        }
+                        
+                        // 定位浮窗（避免被框在容器内）
+                        let tooltipX = mouseX + 15;
+                        let tooltipY = mouseY - 10;
+                        
+                        // 防止浮窗超出屏幕边界
+                        if (tooltipX + 220 > window.innerWidth) {
+                            tooltipX = mouseX - 235;
+                        }
+                        if (tooltipY < 10) {
+                            tooltipY = 10;
+                        }
+                        if (tooltipY + 300 > window.innerHeight) {
+                            tooltipY = window.innerHeight - 310;
+                        }
+                        
+                        coordDisplay.style.left = tooltipX + 'px';
+                        coordDisplay.style.top = tooltipY + 'px';
+                        
+                        // 使用统一的蓝色主题样式
+                        coordDisplay.className = `cost-display`;
+                        
+                        // 生成产品费用列表 - 显示从当前位置到鼠标位置的预算
+                        const productCostHtml = productCosts.map(product => {
+                            return `
+                                <div style="border-left: 3px solid #3B82F6; padding-left: 8px; margin: 4px 0;">
+                                    <div style="color: #374151; font-weight: bold; font-size: 10px;">${product.name}</div>
+                                    <div style="color: #6B7280; font-size: 9px;">当前位置: ${product.currentPosition}</div>
+                                    <div style="color: #6B7280; font-size: 9px;">调整量: 扭矩${product.torqueChange >= 0 ? '+' : ''}${product.torqueChange.toFixed(2)}, 电阻${product.resistanceChange >= 0 ? '+' : ''}${product.resistanceChange.toFixed(2)}</div>
+                                    <div style="color: #1F2937; font-size: 10px; font-weight: bold;">研发预算: $${product.cost.avgCost}M</div>
+                                    <div style="color: #6B7280; font-size: 9px;">预算范围: $${product.cost.minCost}M - $${product.cost.maxCost}M</div>
+                                </div>
+                            `;
+                        }).join('');
+                        
                         coordDisplay.innerHTML = `
-                            <div style="color: #666; font-weight: bold;">实时坐标</div>
-                            <div>扭矩: ${Math.max(0, Math.min(5, dataX)).toFixed(2)}</div>
-                            <div>电阻: ${Math.max(0, Math.min(5, dataY)).toFixed(2)}</div>
+                            <div class="coordinate-info-section">
+                                <div style="color: #374151; font-weight: bold; margin-bottom: 4px;">📍 位置信息</div>
+                                <div style="color: #6B7280;">扭矩: ${currentTorque.toFixed(2)}</div>
+                                <div style="color: #6B7280;">电阻: ${currentResistance.toFixed(2)}</div>
+                            </div>
+                            
+                            <div class="coordinate-info-section">
+                                <div style="color: #374151; font-weight: bold; margin-bottom: 4px;">💰 ${market}市场 - 调整到目标位置的研发预算</div>
+                                ${productCostHtml}
+                            </div>
                         `;
                         coordDisplay.style.display = 'block';
                     } else {
