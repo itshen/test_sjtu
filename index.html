@@ -6,6 +6,7 @@
     <title>市场数据可视化分析平台</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
     <style>
         .chart-container {
             position: relative;
@@ -252,6 +253,60 @@
             </div>
         </div>
 
+        <!-- 各团队产品特性坐标对比 -->
+        <div class="bg-white rounded-lg shadow-md p-4 mb-4">
+            <div class="flex items-center justify-between mb-3">
+                <h2 class="text-xl font-bold text-gray-800">各团队产品特性坐标对比</h2>
+                <div class="text-sm text-gray-600 bg-green-50 px-3 py-1 rounded-full border border-green-200">
+                    📊 各组产品在矩阵中的位置、趋势和预测
+                </div>
+            </div>
+            
+            <!-- 产品特性坐标数据表格 -->
+            <div class="overflow-x-auto mb-4">
+                <table class="w-full table-auto border-collapse">
+                    <thead>
+                        <tr class="bg-gray-50">
+                            <th class="border border-gray-300 px-3 py-2 text-left">组别</th>
+                            <th class="border border-gray-300 px-3 py-2 text-center">雷墨磁1</th>
+                            <th class="border border-gray-300 px-3 py-2 text-center">雷墨磁2</th>
+                            <th class="border border-gray-300 px-3 py-2 text-center">雷墨磁3</th>
+                            <th class="border border-gray-300 px-3 py-2 text-center">平均偏离度</th>
+                            <th class="border border-gray-300 px-3 py-2 text-center">趋势</th>
+                        </tr>
+                    </thead>
+                    <tbody id="team-comparison-tbody">
+                        <!-- 动态生成 -->
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- 各组产品在各市场的位置矩阵图表 -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                <!-- 尤菲亚市场各组产品位置 -->
+                <div class="border rounded-lg p-3">
+                    <h3 class="text-lg font-semibold text-gray-700 mb-2 text-center">尤菲亚市场 - 各组产品位置</h3>
+                    <div class="chart-container h-64">
+                        <canvas id="team-chart-尤菲亚"></canvas>
+                    </div>
+                </div>
+                <!-- 纳达卡市场各组产品位置 -->
+                <div class="border rounded-lg p-3">
+                    <h3 class="text-lg font-semibold text-gray-700 mb-2 text-center">纳达卡市场 - 各组产品位置</h3>
+                    <div class="chart-container h-64">
+                        <canvas id="team-chart-纳达卡"></canvas>
+                    </div>
+                </div>
+                <!-- 尼赫鲁市场各组产品位置 -->
+                <div class="border rounded-lg p-3">
+                    <h3 class="text-lg font-semibold text-gray-700 mb-2 text-center">尼赫鲁市场 - 各组产品位置</h3>
+                    <div class="chart-container h-64">
+                        <canvas id="team-chart-尼赫鲁"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- 市场理想值坐标图 -->
         <div class="bg-white rounded-lg shadow-md p-4 mb-4">
             <div class="flex items-center justify-between mb-3">
@@ -425,6 +480,77 @@
                     <!-- 图表容器 -->
                     <div class="h-[calc(100%-80px)]">
                         <canvas id="trend-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 团队位置详细模态框 -->
+    <div id="team-position-modal" class="trend-modal">
+        <div class="bg-white w-full h-full flex flex-col">
+            <div class="p-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
+                <div class="flex items-center gap-4">
+                    <h3 id="team-position-title" class="text-xl font-semibold text-gray-800"></h3>
+                    <div class="text-sm text-gray-600 bg-green-50 px-3 py-1 rounded-full border border-green-200">
+                        💡 支持鼠标滚轮缩放、拖拽移动查看详细数值
+                    </div>
+                    <div class="text-sm text-gray-600">
+                        键盘提示: ESC 关闭
+                    </div>
+                </div>
+                <button id="close-team-position" class="text-gray-500 hover:text-gray-700 text-3xl">&times;</button>
+            </div>
+            <div class="flex-1 p-6 overflow-hidden">
+                <div class="h-full flex gap-4">
+                    <!-- 控制面板 -->
+                    <div class="w-64 bg-gray-50 rounded-lg p-4 border">
+                        <h4 class="font-semibold text-gray-800 mb-3">显示控制</h4>
+                        
+                        <!-- 图例 -->
+                        <div class="mb-4">
+                            <h5 class="text-sm font-medium text-gray-700 mb-2">图例说明</h5>
+                            <div class="space-y-2 text-xs">
+                                <div class="flex items-center gap-2">
+                                    <div class="w-3 h-3 bg-gray-400" style="clip-path: polygon(50% 0%, 0% 100%, 100% 100%)"></div>
+                                    <span>市场理想值</span>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <div class="w-3 h-3 rounded-full bg-red-400 border-2 border-red-600"></div>
+                                    <span>瞄准该市场</span>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <div class="w-3 h-3 rounded-full bg-red-200 border border-red-400"></div>
+                                    <span>非目标市场</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 组别筛选 -->
+                        <div class="mb-4">
+                            <h5 class="text-sm font-medium text-gray-700 mb-2">组别显示</h5>
+                            <div class="space-y-1" id="team-filter-controls">
+                                <!-- 动态生成 -->
+                            </div>
+                        </div>
+
+                        <!-- 产品筛选 -->
+                        <div class="mb-4">
+                            <h5 class="text-sm font-medium text-gray-700 mb-2">产品显示</h5>
+                            <div class="space-y-1" id="product-filter-controls">
+                                <!-- 动态生成 -->
+                            </div>
+                        </div>
+
+                        <!-- 重置按钮 -->
+                        <button id="reset-team-chart" class="w-full bg-blue-500 text-white py-2 px-3 rounded text-sm hover:bg-blue-600 transition-colors">
+                            重置视图
+                        </button>
+                    </div>
+                    
+                    <!-- 图表容器 -->
+                    <div class="flex-1 h-full">
+                        <canvas id="team-position-detail-chart"></canvas>
                     </div>
                 </div>
             </div>

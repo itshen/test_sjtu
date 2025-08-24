@@ -10,6 +10,9 @@ let currentGroup = '1';
 let currentProduct = '尤菲亚P1';
 let currentView = 'by-group';
 let marketShareHiddenItems = {}; // 记录每个组的隐藏状态
+let teamCharts = {}; // 团队图表实例
+let teamPositionDetailChart = null; // 团队位置详细图表实例
+let currentDetailMarket = ''; // 当前详细查看的市场
 
 // 期间顺序定义
 const periodOrder = ['1A', '1B', '2', '3', '4'];
@@ -261,7 +264,8 @@ function generatePredictionData() {
     const predictionData = {
         industryData: {},
         marketShare: {},
-        marketIdealValues: {}
+        marketIdealValues: {},
+        teamCoordinates: {}
     };
     
     // 预测行业数据
@@ -295,11 +299,11 @@ function generatePredictionData() {
     
     // 预测市场理想值
     const markets = ['尤菲亚', '纳达卡', '尼赫鲁'];
-    const magnetProducts = ['雷墨磁1', '雷墨磁2', '雷墨磁3'];
+    const idealMagnetProducts = ['雷墨磁1', '雷墨磁2', '雷墨磁3'];
     
     markets.forEach(market => {
         predictionData.marketIdealValues[market] = {};
-        magnetProducts.forEach(product => {
+        idealMagnetProducts.forEach(product => {
             const historicalTorque = periods.map(period => 
                 allData[period]?.marketIdealValues?.[market]?.[product]?.扭矩
             );
@@ -315,11 +319,46 @@ function generatePredictionData() {
         });
     });
     
+    // 预测各组产品特性坐标数据
+    const teams = ['1', '2', '3', '4', '5'];
+    const teamMagnetProducts = ['雷墨磁1', '雷墨磁2', '雷墨磁3'];
+    
+    teams.forEach(teamId => {
+        predictionData.teamCoordinates[teamId] = {};
+        teamMagnetProducts.forEach(product => {
+            const historicalTorque = periods.map(period => 
+                allData[period]?.teamCoordinates?.[teamId]?.[product]?.扭矩
+            );
+            const historicalResistance = periods.map(period => 
+                allData[period]?.teamCoordinates?.[teamId]?.[product]?.电阻
+            );
+            const historicalDeviations = periods.map(period => 
+                allData[period]?.teamCoordinates?.[teamId]?.[product]?.偏离度
+            );
+            
+            // 获取最近的目标市场
+            const recentTargetMarket = allData['3']?.teamCoordinates?.[teamId]?.[product]?.目标市场 || 
+                                     allData['2']?.teamCoordinates?.[teamId]?.[product]?.目标市场 || '无';
+            
+            predictionData.teamCoordinates[teamId][product] = {
+                扭矩: predictRateData(historicalTorque),
+                电阻: predictRateData(historicalResistance),
+                目标市场: recentTargetMarket,
+                偏离度: predictRateData(historicalDeviations)
+            };
+        });
+    });
+    
     return predictionData;
 }
 
 // 页面加载完成后初始化
 document.addEventListener('DOMContentLoaded', function() {
+    // 注册Chart.js插件
+    if (typeof Chart !== 'undefined' && typeof zoomPlugin !== 'undefined') {
+        Chart.register(zoomPlugin);
+    }
+    
     loadAllData();
     initAuth();
     initEventListeners();
@@ -376,6 +415,14 @@ function initEventListeners() {
     document.getElementById('trend-modal').addEventListener('click', function(e) {
         if (e.target === this) {
             closeTrendModal();
+        }
+    });
+
+    // 团队位置详细模态框事件
+    document.getElementById('close-team-position').addEventListener('click', closeTeamPositionModal);
+    document.getElementById('team-position-modal').addEventListener('click', function(e) {
+        if (e.target === this) {
+            closeTeamPositionModal();
         }
     });
 
@@ -486,6 +533,7 @@ function initEventListeners() {
         if (e.key === 'Escape') {
             closeTrendModal();
             closePredictionInfoModal();
+            closeTeamPositionModal();
         }
     });
 
@@ -548,6 +596,10 @@ function displayData(period) {
     } else {
         displayProductComparison(data.marketShare);
     }
+    
+    // 显示各团队产品特性坐标对比数据
+    displayTeamComparison(data.teamCoordinates);
+    displayTeamPositionCharts(data.teamCoordinates, data.marketIdealValues);
     
     displayCoordinateCharts(data.marketIdealValues);
 }
@@ -1897,4 +1949,778 @@ function updateSessionTimer() {
         // 超过10分钟时隐藏会话信息
         sessionInfo.classList.add('hidden');
     }
+}
+
+// 显示各团队产品特性坐标对比表格
+function displayTeamComparison(teamCoordinates) {
+    const tbody = document.getElementById('team-comparison-tbody');
+    if (!tbody || !teamCoordinates) return;
+    
+    tbody.innerHTML = '';
+    const isPrediction = currentPeriod === '4';
+
+    // 获取上一个期间的数据用于环比
+    const prevPeriod = getPreviousPeriod(currentPeriod);
+    const prevTeamData = prevPeriod ? allData[prevPeriod]?.teamCoordinates : null;
+
+    Object.keys(teamCoordinates).forEach(teamId => {
+        const team = teamCoordinates[teamId];
+        const prevTeam = prevTeamData ? prevTeamData[teamId] : null;
+        
+        // 计算平均偏离度
+        const deviations = [];
+        Object.keys(team).forEach(product => {
+            if (team[product].偏离度 !== null && team[product].偏离度 !== undefined) {
+                deviations.push(team[product].偏离度);
+            }
+        });
+        const avgDeviation = deviations.length > 0 ? 
+            (deviations.reduce((sum, dev) => sum + dev, 0) / deviations.length).toFixed(3) : '-';
+
+        // 计算趋势
+        let trendIndicator = '→';
+        let trendClass = 'text-gray-500';
+        if (prevTeam) {
+            const prevDeviations = [];
+            Object.keys(prevTeam).forEach(product => {
+                if (prevTeam[product].偏离度 !== null && prevTeam[product].偏离度 !== undefined) {
+                    prevDeviations.push(prevTeam[product].偏离度);
+                }
+            });
+            const prevAvgDeviation = prevDeviations.length > 0 ? 
+                prevDeviations.reduce((sum, dev) => sum + dev, 0) / prevDeviations.length : null;
+            
+            if (prevAvgDeviation !== null && avgDeviation !== '-') {
+                const currentAvg = parseFloat(avgDeviation);
+                if (currentAvg < prevAvgDeviation) {
+                    trendIndicator = '↓';
+                    trendClass = 'text-green-500';
+                } else if (currentAvg > prevAvgDeviation) {
+                    trendIndicator = '↑';
+                    trendClass = 'text-red-500';
+                }
+            }
+        }
+
+        const row = document.createElement('tr');
+        const predictionClass = isPrediction ? 'prediction-data' : '';
+        
+        row.innerHTML = `
+            <td class="border border-gray-300 px-3 py-2 font-medium cursor-pointer hover:bg-blue-50 transition-colors text-sm ${predictionClass}" 
+                onclick="showTeamTrend('${teamId}')" title="点击查看该组产品特性趋势">
+                第 ${teamId} 组 📈
+            </td>
+            <td class="border border-gray-300 px-3 py-2 text-center text-xs ${predictionClass}">
+                <div>扭矩: ${team.雷墨磁1.扭矩}</div>
+                <div>电阻: ${team.雷墨磁1.电阻}</div>
+                <div class="text-blue-600">目标: ${team.雷墨磁1.目标市场}</div>
+                <div class="text-orange-600">偏离: ${team.雷墨磁1.偏离度 || '-'}</div>
+            </td>
+            <td class="border border-gray-300 px-3 py-2 text-center text-xs ${predictionClass}">
+                <div>扭矩: ${team.雷墨磁2.扭矩}</div>
+                <div>电阻: ${team.雷墨磁2.电阻}</div>
+                <div class="text-blue-600">目标: ${team.雷墨磁2.目标市场}</div>
+                <div class="text-orange-600">偏离: ${team.雷墨磁2.偏离度 || '-'}</div>
+            </td>
+            <td class="border border-gray-300 px-3 py-2 text-center text-xs ${predictionClass}">
+                <div>扭矩: ${team.雷墨磁3.扭矩}</div>
+                <div>电阻: ${team.雷墨磁3.电阻}</div>
+                <div class="text-blue-600">目标: ${team.雷墨磁3.目标市场}</div>
+                <div class="text-orange-600">偏离: ${team.雷墨磁3.偏离度 || '-'}</div>
+            </td>
+            <td class="border border-gray-300 px-3 py-2 text-center font-semibold ${predictionClass}">
+                ${avgDeviation}
+            </td>
+            <td class="border border-gray-300 px-3 py-2 text-center text-lg ${trendClass} ${predictionClass}">
+                ${trendIndicator}
+            </td>
+        `;
+        tbody.appendChild(row);
+    });
+}
+
+// 显示各组产品在各市场的位置图表
+function displayTeamPositionCharts(teamCoordinates, marketIdealValues) {
+    if (!teamCoordinates || !marketIdealValues) return;
+    
+    const markets = ['尤菲亚', '纳达卡', '尼赫鲁'];
+    const teamColors = {
+        '1': '#FF6384',
+        '2': '#36A2EB', 
+        '3': '#FFCE56',
+        '4': '#4BC0C0',
+        '5': '#9966FF'
+    };
+
+    markets.forEach(market => {
+        const ctx = document.getElementById(`team-chart-${market}`);
+        if (!ctx) return;
+
+        // 销毁之前的图表
+        if (teamCharts[market]) {
+            teamCharts[market].destroy();
+        }
+
+        // 准备数据
+        const datasets = [];
+        
+        // 添加市场理想值点（作为参考）
+        const idealProducts = ['雷墨磁1', '雷墨磁2', '雷墨磁3'];
+        idealProducts.forEach((product, index) => {
+            if (marketIdealValues[market] && marketIdealValues[market][product]) {
+                const idealPoint = marketIdealValues[market][product];
+                datasets.push({
+                    label: `${product} (理想值)`,
+                    data: [{
+                        x: idealPoint.扭矩,
+                        y: idealPoint.电阻,
+                        product: product,
+                        market: market,
+                        type: 'ideal'
+                    }],
+                    backgroundColor: '#E5E7EB',
+                    borderColor: '#9CA3AF',
+                    pointRadius: 8,
+                    pointHoverRadius: 10,
+                    showLine: false,
+                    pointStyle: 'triangle'
+                });
+            }
+        });
+
+        // 添加团队数据点
+        Object.keys(teamCoordinates).forEach(teamId => {
+            const team = teamCoordinates[teamId];
+            idealProducts.forEach(product => {
+                if (team[product]) {
+                    // 判断这个产品是否瞄准当前市场
+                    const targetMarket = team[product].目标市场;
+                    let isTargetingThisMarket = false;
+                    
+                    if (market === '尤菲亚' && (targetMarket === '尤1' || targetMarket === '尤2' || targetMarket === '尤3')) {
+                        isTargetingThisMarket = true;
+                    } else if (market === '纳达卡' && (targetMarket === '纳1' || targetMarket === '纳2' || targetMarket === '纳3')) {
+                        isTargetingThisMarket = true;
+                    } else if (market === '尼赫鲁' && (targetMarket === '尼1' || targetMarket === '尼2' || targetMarket === '尼3')) {
+                        isTargetingThisMarket = true;
+                    }
+
+                    datasets.push({
+                        label: `第${teamId}组 ${product}`,
+                        data: [{
+                            x: team[product].扭矩,
+                            y: team[product].电阻,
+                            teamId: teamId,
+                            product: product,
+                            targetMarket: targetMarket,
+                            deviation: team[product].偏离度,
+                            type: 'team',
+                            isTargeting: isTargetingThisMarket
+                        }],
+                        backgroundColor: isTargetingThisMarket ? teamColors[teamId] : teamColors[teamId] + '40',
+                        borderColor: teamColors[teamId],
+                        pointRadius: isTargetingThisMarket ? 10 : 6,
+                        pointHoverRadius: isTargetingThisMarket ? 12 : 8,
+                        showLine: false,
+                        borderWidth: isTargetingThisMarket ? 3 : 1
+                    });
+                }
+            });
+        });
+
+        // 创建新图表
+        teamCharts[market] = new Chart(ctx, {
+            type: 'scatter',
+            data: { datasets },
+            plugins: [{
+                id: 'teamLabels',
+                afterDraw: function(chart) {
+                    const ctx = chart.ctx;
+                    const datasets = chart.data.datasets;
+                    
+                    datasets.forEach((dataset, datasetIndex) => {
+                        const meta = chart.getDatasetMeta(datasetIndex);
+                        
+                        dataset.data.forEach((point, index) => {
+                            const element = meta.data[index];
+                            if (element && !element.hidden && point.type === 'team') {
+                                ctx.save();
+                                ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+                                ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
+                                ctx.lineWidth = 1;
+                                ctx.font = 'bold 9px Arial';
+                                
+                                const text = `${point.teamId}`;
+                                const textWidth = ctx.measureText(text).width;
+                                const padding = 2;
+                                
+                                // 标签位置（在点的中心）
+                                const x = element.x;
+                                const y = element.y;
+                                
+                                // 绘制背景圆形
+                                ctx.beginPath();
+                                ctx.arc(x, y, 8, 0, 2 * Math.PI);
+                                ctx.fill();
+                                ctx.stroke();
+                                
+                                // 绘制文本
+                                ctx.fillStyle = '#333';
+                                ctx.textAlign = 'center';
+                                ctx.textBaseline = 'middle';
+                                ctx.fillText(text, x, y);
+                                ctx.restore();
+                            }
+                        });
+                    });
+                }
+            }],
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: false,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: `${market}市场 - 各组产品位置`,
+                        font: { size: 14, weight: 'bold' }
+                    },
+                    legend: {
+                        display: false  // 隐藏图例，因为信息较多
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                        titleColor: '#fff',
+                        bodyColor: '#fff',
+                        callbacks: {
+                            title: function(context) {
+                                if (context.length > 0) {
+                                    const point = context[0].raw;
+                                    if (point.type === 'ideal') {
+                                        return `${point.market} ${point.product} (理想值)`;
+                                    } else {
+                                        return `第${point.teamId}组 ${point.product}`;
+                                    }
+                                }
+                                return '';
+                            },
+                            label: function(context) {
+                                const point = context.raw;
+                                let labels = [
+                                    `扭矩: ${point.x}`,
+                                    `电阻: ${point.y}`
+                                ];
+                                
+                                if (point.type === 'team') {
+                                    labels.push(`目标市场: ${point.targetMarket}`);
+                                    if (point.deviation !== null && point.deviation !== undefined) {
+                                        labels.push(`偏离度: ${point.deviation}`);
+                                    }
+                                    if (point.isTargeting) {
+                                        labels.push('✓ 瞄准此市场');
+                                    } else {
+                                        labels.push('○ 非目标市场');
+                                    }
+                                }
+                                
+                                return labels;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        title: {
+                            display: true,
+                            text: '扭矩',
+                            font: { size: 12, weight: 'bold' }
+                        },
+                        beginAtZero: true,
+                        max: 5,
+                        min: 0,
+                        ticks: {
+                            stepSize: 0.5,
+                            callback: function(value) {
+                                return value.toFixed(1);
+                            }
+                        },
+                        grid: {
+                            display: true,
+                            color: 'rgba(0, 0, 0, 0.1)'
+                        }
+                    },
+                    y: {
+                        title: {
+                            display: true,
+                            text: '电阻',
+                            font: { size: 12, weight: 'bold' }
+                        },
+                        beginAtZero: true,
+                        max: 5,
+                        min: 0,
+                        ticks: {
+                            stepSize: 0.5,
+                            callback: function(value) {
+                                return value.toFixed(1);
+                            }
+                        },
+                        grid: {
+                            display: true,
+                            color: 'rgba(0, 0, 0, 0.1)'
+                        }
+                    }
+                },
+                onClick: function(event, elements) {
+                    // 点击图表区域打开详细模态框
+                    showTeamPositionDetail(market);
+                }
+            }
+        });
+    });
+}
+
+// 显示该组产品特性趋势分析
+function showTeamTrend(teamId) {
+    const modal = document.getElementById('trend-modal');
+    const title = document.getElementById('trend-title');
+    
+    title.textContent = `第${teamId}组 - 产品特性坐标趋势分析`;
+    
+    // 准备趋势数据
+    const periods = ['1A', '1B', '2', '3'];
+    const products = ['雷墨磁1', '雷墨磁2', '雷墨磁3'];
+    let allTrendData = [];
+
+    products.forEach(product => {
+        const torqueData = [];
+        const resistanceData = [];
+        const deviationData = [];
+        
+        periods.forEach(period => {
+            if (allData[period] && allData[period].teamCoordinates && allData[period].teamCoordinates[teamId]) {
+                const teamProduct = allData[period].teamCoordinates[teamId][product];
+                if (teamProduct) {
+                    torqueData.push({x: period, y: teamProduct.扭矩});
+                    resistanceData.push({x: period, y: teamProduct.电阻});
+                    if (teamProduct.偏离度 !== null && teamProduct.偏离度 !== undefined) {
+                        deviationData.push({x: period, y: teamProduct.偏离度});
+                    }
+                }
+            }
+        });
+        
+        if (torqueData.length > 0) {
+            allTrendData.push({
+                product: `${product} - 扭矩`,
+                data: torqueData
+            });
+        }
+        if (resistanceData.length > 0) {
+            allTrendData.push({
+                product: `${product} - 电阻`,
+                data: resistanceData
+            });
+        }
+        if (deviationData.length > 0) {
+            allTrendData.push({
+                product: `${product} - 偏离度`,
+                data: deviationData
+            });
+        }
+    });
+
+    // 创建产品选择器
+    createProductSelector(allTrendData, `第${teamId}组`, 'teamTrend');
+    
+    // 默认显示所有产品
+    if (allTrendData.length > 0) {
+        createTrendChart(allTrendData, allTrendData, `第${teamId}组`, 'teamTrend', 'show-all');
+    }
+    
+    modal.classList.add('show');
+}
+
+// 显示团队位置详细模态框
+function showTeamPositionDetail(market) {
+    const modal = document.getElementById('team-position-modal');
+    const title = document.getElementById('team-position-title');
+    
+    currentDetailMarket = market;
+    title.textContent = `${market}市场 - 各组产品特性坐标详细视图`;
+    
+    // 创建筛选控件
+    createTeamFilterControls();
+    createProductFilterControls();
+    
+    // 创建详细图表
+    createTeamPositionDetailChart(market);
+    
+    modal.classList.add('show');
+}
+
+// 关闭团队位置详细模态框
+function closeTeamPositionModal() {
+    const modal = document.getElementById('team-position-modal');
+    modal.classList.remove('show');
+    if (teamPositionDetailChart) {
+        teamPositionDetailChart.destroy();
+        teamPositionDetailChart = null;
+    }
+}
+
+// 创建组别筛选控件
+function createTeamFilterControls() {
+    const container = document.getElementById('team-filter-controls');
+    container.innerHTML = '';
+    
+    const teams = ['1', '2', '3', '4', '5'];
+    const teamColors = {
+        '1': '#FF6384',
+        '2': '#36A2EB', 
+        '3': '#FFCE56',
+        '4': '#4BC0C0',
+        '5': '#9966FF'
+    };
+    
+    teams.forEach(teamId => {
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.id = `team-filter-${teamId}`;
+        checkbox.checked = true;
+        checkbox.className = 'mr-2';
+        checkbox.addEventListener('change', updateTeamPositionChart);
+        
+        const label = document.createElement('label');
+        label.htmlFor = `team-filter-${teamId}`;
+        label.className = 'flex items-center text-sm cursor-pointer';
+        label.innerHTML = `
+            <div class="w-3 h-3 rounded-full mr-2" style="background-color: ${teamColors[teamId]}"></div>
+            第${teamId}组
+        `;
+        label.prepend(checkbox);
+        
+        container.appendChild(label);
+    });
+}
+
+// 创建产品筛选控件
+function createProductFilterControls() {
+    const container = document.getElementById('product-filter-controls');
+    container.innerHTML = '';
+    
+    const products = ['雷墨磁1', '雷墨磁2', '雷墨磁3'];
+    
+    products.forEach(product => {
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.id = `product-filter-${product}`;
+        checkbox.checked = true;
+        checkbox.className = 'mr-2';
+        checkbox.addEventListener('change', updateTeamPositionChart);
+        
+        const label = document.createElement('label');
+        label.htmlFor = `product-filter-${product}`;
+        label.className = 'flex items-center text-sm cursor-pointer';
+        label.textContent = product;
+        label.prepend(checkbox);
+        
+        container.appendChild(label);
+    });
+}
+
+// 创建团队位置详细图表
+function createTeamPositionDetailChart(market) {
+    const ctx = document.getElementById('team-position-detail-chart');
+    if (!ctx) return;
+
+    // 销毁之前的图表
+    if (teamPositionDetailChart) {
+        teamPositionDetailChart.destroy();
+    }
+
+    const teamCoordinates = allData[currentPeriod]?.teamCoordinates;
+    const marketIdealValues = allData[currentPeriod]?.marketIdealValues;
+    
+    if (!teamCoordinates || !marketIdealValues) return;
+
+    // 准备数据
+    const datasets = [];
+    const teamColors = {
+        '1': '#FF6384',
+        '2': '#36A2EB', 
+        '3': '#FFCE56',
+        '4': '#4BC0C0',
+        '5': '#9966FF'
+    };
+
+    // 添加市场理想值点（作为参考）
+    const idealProducts = ['雷墨磁1', '雷墨磁2', '雷墨磁3'];
+    idealProducts.forEach((product, index) => {
+        if (marketIdealValues[market] && marketIdealValues[market][product]) {
+            const idealPoint = marketIdealValues[market][product];
+            datasets.push({
+                label: `${product} (理想值)`,
+                data: [{
+                    x: idealPoint.扭矩,
+                    y: idealPoint.电阻,
+                    product: product,
+                    market: market,
+                    type: 'ideal'
+                }],
+                backgroundColor: '#9CA3AF',
+                borderColor: '#6B7280',
+                pointRadius: 12,
+                pointHoverRadius: 15,
+                showLine: false,
+                pointStyle: 'triangle'
+            });
+        }
+    });
+
+    // 添加团队数据点
+    Object.keys(teamCoordinates).forEach(teamId => {
+        const team = teamCoordinates[teamId];
+        idealProducts.forEach(product => {
+            if (team[product]) {
+                // 判断这个产品是否瞄准当前市场
+                const targetMarket = team[product].目标市场;
+                let isTargetingThisMarket = false;
+                
+                if (market === '尤菲亚' && (targetMarket === '尤1' || targetMarket === '尤2' || targetMarket === '尤3')) {
+                    isTargetingThisMarket = true;
+                } else if (market === '纳达卡' && (targetMarket === '纳1' || targetMarket === '纳2' || targetMarket === '纳3')) {
+                    isTargetingThisMarket = true;
+                } else if (market === '尼赫鲁' && (targetMarket === '尼1' || targetMarket === '尼2' || targetMarket === '尼3')) {
+                    isTargetingThisMarket = true;
+                }
+
+                datasets.push({
+                    label: `第${teamId}组 ${product}`,
+                    data: [{
+                        x: team[product].扭矩,
+                        y: team[product].电阻,
+                        teamId: teamId,
+                        product: product,
+                        targetMarket: targetMarket,
+                        deviation: team[product].偏离度,
+                        type: 'team',
+                        isTargeting: isTargetingThisMarket
+                    }],
+                    backgroundColor: isTargetingThisMarket ? teamColors[teamId] : teamColors[teamId] + '40',
+                    borderColor: teamColors[teamId],
+                    pointRadius: isTargetingThisMarket ? 15 : 10,
+                    pointHoverRadius: isTargetingThisMarket ? 18 : 13,
+                    showLine: false,
+                    borderWidth: isTargetingThisMarket ? 3 : 1
+                });
+            }
+        });
+    });
+
+    // 创建新图表，支持缩放和平移
+    teamPositionDetailChart = new Chart(ctx, {
+        type: 'scatter',
+        data: { datasets },
+        plugins: [{
+            id: 'detailTeamLabels',
+            afterDraw: function(chart) {
+                const ctx = chart.ctx;
+                const datasets = chart.data.datasets;
+                
+                datasets.forEach((dataset, datasetIndex) => {
+                    const meta = chart.getDatasetMeta(datasetIndex);
+                    
+                    dataset.data.forEach((point, index) => {
+                        const element = meta.data[index];
+                        if (element && !element.hidden && point.type === 'team') {
+                            ctx.save();
+                            ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+                            ctx.strokeStyle = 'rgba(0, 0, 0, 0.7)';
+                            ctx.lineWidth = 2;
+                            ctx.font = 'bold 12px Arial';
+                            
+                            const text = `${point.teamId}`;
+                            
+                            // 标签位置（在点的中心）
+                            const x = element.x;
+                            const y = element.y;
+                            
+                            // 绘制背景圆形
+                            ctx.beginPath();
+                            ctx.arc(x, y, 12, 0, 2 * Math.PI);
+                            ctx.fill();
+                            ctx.stroke();
+                            
+                            // 绘制文本
+                            ctx.fillStyle = '#333';
+                            ctx.textAlign = 'center';
+                            ctx.textBaseline = 'middle';
+                            ctx.fillText(text, x, y);
+                            ctx.restore();
+                        }
+                    });
+                });
+            }
+        }],
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: false,
+            plugins: {
+                title: {
+                    display: true,
+                    text: `${market}市场 - 各组产品特性坐标详细视图 (${currentPeriod}期间${currentPeriod === '4' ? ' - 预测数据' : ''})`,
+                    font: { size: 16, weight: 'bold' },
+                    color: currentPeriod === '4' ? '#8B5CF6' : '#333'
+                },
+                legend: {
+                    display: false  // 隐藏图例，使用侧边栏控制
+                },
+                tooltip: {
+                    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+                    titleColor: '#fff',
+                    bodyColor: '#fff',
+                    borderColor: '#fff',
+                    borderWidth: 1,
+                    cornerRadius: 8,
+                    bodySpacing: 4,
+                    callbacks: {
+                        title: function(context) {
+                            if (context.length > 0) {
+                                const point = context[0].raw;
+                                if (point.type === 'ideal') {
+                                    return `${point.market} ${point.product} (理想值)`;
+                                } else {
+                                    return `第${point.teamId}组 ${point.product}`;
+                                }
+                            }
+                            return '';
+                        },
+                        label: function(context) {
+                            const point = context.raw;
+                            let labels = [
+                                `扭矩: ${point.x}`,
+                                `电阻: ${point.y}`
+                            ];
+                            
+                            if (point.type === 'team') {
+                                labels.push(`目标市场: ${point.targetMarket}`);
+                                if (point.deviation !== null && point.deviation !== undefined) {
+                                    labels.push(`偏离度: ${point.deviation}`);
+                                }
+                                if (point.isTargeting) {
+                                    labels.push('✓ 瞄准此市场');
+                                } else {
+                                    labels.push('○ 非目标市场');
+                                }
+                            }
+                            
+                            return labels;
+                        }
+                    }
+                },
+                zoom: {
+                    zoom: {
+                        wheel: {
+                            enabled: true,
+                        },
+                        pinch: {
+                            enabled: true
+                        },
+                        mode: 'xy',
+                        speed: 0.1
+                    },
+                    pan: {
+                        enabled: true,
+                        mode: 'xy',
+                        speed: 0.5
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    title: {
+                        display: true,
+                        text: '扭矩',
+                        font: { size: 14, weight: 'bold' }
+                    },
+                    beginAtZero: true,
+                    max: 5,
+                    min: 0,
+                    ticks: {
+                        stepSize: 0.1,
+                        callback: function(value) {
+                            return value.toFixed(1);
+                        }
+                    },
+                    grid: {
+                        display: true,
+                        color: 'rgba(0, 0, 0, 0.1)'
+                    }
+                },
+                y: {
+                    title: {
+                        display: true,
+                        text: '电阻',
+                        font: { size: 14, weight: 'bold' }
+                    },
+                    beginAtZero: true,
+                    max: 5,
+                    min: 0,
+                    ticks: {
+                        stepSize: 0.1,
+                        callback: function(value) {
+                            return value.toFixed(1);
+                        }
+                    },
+                    grid: {
+                        display: true,
+                        color: 'rgba(0, 0, 0, 0.1)'
+                    }
+                }
+            }
+        }
+    });
+
+    // 添加重置按钮事件
+    document.getElementById('reset-team-chart').onclick = function() {
+        if (teamPositionDetailChart) {
+            teamPositionDetailChart.resetZoom();
+        }
+    };
+}
+
+// 更新团队位置图表（根据筛选条件）
+function updateTeamPositionChart() {
+    if (!teamPositionDetailChart) return;
+    
+    // 获取筛选状态
+    const selectedTeams = [];
+    const selectedProducts = [];
+    
+    document.querySelectorAll('#team-filter-controls input[type="checkbox"]:checked').forEach(checkbox => {
+        selectedTeams.push(checkbox.id.replace('team-filter-', ''));
+    });
+    
+    document.querySelectorAll('#product-filter-controls input[type="checkbox"]:checked').forEach(checkbox => {
+        selectedProducts.push(checkbox.id.replace('product-filter-', ''));
+    });
+    
+    // 更新数据集的可见性
+    teamPositionDetailChart.data.datasets.forEach((dataset, index) => {
+        const meta = teamPositionDetailChart.getDatasetMeta(index);
+        const data = dataset.data[0];
+        
+        if (data.type === 'ideal') {
+            // 理想值始终显示
+            meta.hidden = false;
+        } else if (data.type === 'team') {
+            // 根据筛选条件显示/隐藏团队数据
+            const showTeam = selectedTeams.includes(data.teamId);
+            const showProduct = selectedProducts.includes(data.product);
+            meta.hidden = !(showTeam && showProduct);
+        }
+    });
+    
+    teamPositionDetailChart.update();
 }
