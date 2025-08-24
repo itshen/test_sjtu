@@ -127,6 +127,45 @@ function predictCostData(historicalValues) {
     return Math.round(prediction * 100) / 100;
 }
 
+// 为价格数据预测（结合趋势和市场波动）
+function predictPriceData(historicalValues) {
+    const validValues = historicalValues.filter(val => 
+        val !== null && val !== undefined && !isNaN(parseFloat(val))
+    ).map(val => parseFloat(val));
+    
+    if (validValues.length === 0) return null;
+    if (validValues.length === 1) {
+        // 价格通常有小幅调整
+        return Math.round(validValues[0] * (0.98 + Math.random() * 0.04) * 100) / 100;
+    }
+    
+    // 计算价格变化趋势
+    const xValues = validValues.map((_, index) => index + 1);
+    const { slope, intercept } = linearRegression(xValues, validValues);
+    let prediction = slope * (validValues.length + 1) + intercept;
+    
+    // 价格波动性较大，添加基于历史波动的调整
+    const volatility = calculateVolatility(validValues);
+    const marketAdjustment = (Math.random() - 0.5) * volatility * 0.3;
+    prediction += marketAdjustment;
+    
+    // 确保价格合理范围（不会过低或过高）
+    const avgPrice = validValues.reduce((sum, val) => sum + val, 0) / validValues.length;
+    if (prediction < avgPrice * 0.7) prediction = avgPrice * 0.7;
+    if (prediction > avgPrice * 1.8) prediction = avgPrice * 1.5;
+    
+    return Math.round(prediction * 100) / 100;
+}
+
+// 计算价格波动性
+function calculateVolatility(values) {
+    if (values.length < 2) return 0;
+    
+    const mean = values.reduce((sum, val) => sum + val, 0) / values.length;
+    const variance = values.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / values.length;
+    return Math.sqrt(variance);
+}
+
 // 研发费用计算算法 - 基于扭矩和电阻变化
 function calculateRDCost(torqueChange, resistanceChange, productType = '雷墨磁1/3') {
     // 基于分析数据的费用预测模型
@@ -264,6 +303,7 @@ function generatePredictionData() {
     const predictionData = {
         industryData: {},
         marketShare: {},
+        marketPricing: {},
         marketIdealValues: {},
         teamCoordinates: {}
     };
@@ -294,6 +334,18 @@ function generatePredictionData() {
             );
             // 市场份额使用比率数据预测逻辑
             predictionData.marketShare[group][product] = predictRateData(historicalValues);
+        });
+    });
+    
+    // 预测市场定价
+    groups.forEach(group => {
+        predictionData.marketPricing[group] = {};
+        shareProducts.forEach(product => {
+            const historicalValues = periods.map(period => 
+                allData[period]?.marketPricing?.[group]?.[product]
+            );
+            // 市场定价使用价格数据预测逻辑
+            predictionData.marketPricing[group][product] = predictPriceData(historicalValues);
         });
     });
     
@@ -598,6 +650,7 @@ function displayData(period) {
     
     displayIndustryData(data.industryData);
     displayMarketShareTable(data.marketShare);
+    displayMarketPricingTable(data.marketPricing);
     
     // 根据当前视图显示对应的图表
     if (currentView === 'by-group') {
@@ -696,6 +749,45 @@ function displayMarketShareTable(marketShare) {
                 组 ${group} 📈
             </td>
             ${cells}
+        `;
+        tbody.appendChild(row);
+    });
+}
+
+// 显示市场定价表格
+function displayMarketPricingTable(marketPricing) {
+    const tbody = document.getElementById('market-pricing-tbody');
+    tbody.innerHTML = '';
+
+    const isPrediction = currentPeriod === '4';
+    
+    // 获取上一个期间的数据用于环比
+    const prevPeriod = getPreviousPeriod(currentPeriod);
+    const prevData = prevPeriod ? allData[prevPeriod]?.marketPricing : null;
+
+    Object.keys(marketPricing).forEach(group => {
+        const row = document.createElement('tr');
+        const cells = Object.keys(marketPricing[group]).map(product => {
+            const currentValue = marketPricing[group][product];
+            const prevValue = prevData ? prevData[group]?.[product] : null;
+            
+            let cellContent = `${currentValue}`;
+            
+            if (showComparison && prevValue !== null && prevValue !== undefined) {
+                const comparison = calculateComparison(currentValue, prevValue);
+                if (comparison.change !== 0) {
+                    const arrow = comparison.direction === 'up' ? '↗' : '↘';
+                    const color = comparison.direction === 'up' ? 'text-green-600' : 'text-red-600';
+                    cellContent += ` <span class="${color} text-xs">${arrow}${Math.abs(comparison.change).toFixed(1)}</span>`;
+                }
+            }
+            
+            return cellContent;
+        });
+        
+        row.innerHTML = `
+            <td class="border border-gray-300 px-4 py-2 font-medium bg-gray-50">组${group}</td>
+            ${cells.map(cell => `<td class="border border-gray-300 px-4 py-2 text-center ${isPrediction ? 'bg-purple-50 font-semibold text-purple-700' : ''}">${cell}</td>`).join('')}
         `;
         tbody.appendChild(row);
     });

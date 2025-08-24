@@ -261,6 +261,37 @@
             </div>
         </div>
 
+        <!-- 市场定价 -->
+        <div class="bg-white rounded-lg shadow-md p-4 mb-4">
+            <div class="flex items-center justify-between mb-3">
+                <h2 class="text-xl font-bold text-gray-800">市场定价</h2>
+                <button id="market-pricing-prediction-info-btn" class="bg-indigo-500 text-white px-3 py-1 rounded text-xs hover:bg-indigo-600 transition-colors prediction-info-trigger hidden" title="查看预测算法说明">
+                    📊 算法说明
+                </button>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full table-auto border-collapse">
+                    <thead>
+                        <tr class="bg-gray-50">
+                            <th class="border border-gray-300 px-4 py-2 text-left">组序</th>
+                            <th class="border border-gray-300 px-4 py-2 text-center">尤菲亚P1</th>
+                            <th class="border border-gray-300 px-4 py-2 text-center">尤菲亚P2</th>
+                            <th class="border border-gray-300 px-4 py-2 text-center">尤菲亚P3</th>
+                            <th class="border border-gray-300 px-4 py-2 text-center">纳达卡P1</th>
+                            <th class="border border-gray-300 px-4 py-2 text-center">纳达卡P2</th>
+                            <th class="border border-gray-300 px-4 py-2 text-center">纳达卡P3</th>
+                            <th class="border border-gray-300 px-4 py-2 text-center">尼赫鲁P1</th>
+                            <th class="border border-gray-300 px-4 py-2 text-center">尼赫鲁P2</th>
+                            <th class="border border-gray-300 px-4 py-2 text-center">尼赫鲁P3</th>
+                        </tr>
+                    </thead>
+                    <tbody id="market-pricing-tbody">
+                        <!-- 动态生成 -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
         <!-- 各团队产品特性坐标对比 -->
         <div class="bg-white rounded-lg shadow-md p-4 mb-4">
             <div class="flex items-center justify-between mb-3">
