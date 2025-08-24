@@ -15,7 +15,7 @@ let teamPositionDetailChart = null; // 团队位置详细图表实例
 let currentDetailMarket = ''; // 当前详细查看的市场
 
 // 期间顺序定义
-const periodOrder = ['1A', '1B', '2', '3', '4'];
+const periodOrder = ['1A', '1B', '2', '3', '4', '5'];
 
 // 预测算法：线性回归
 function linearRegression(xValues, yValues) {
@@ -296,10 +296,10 @@ function predictValueByType(historicalValues, dataType) {
     }
 }
 
-// 生成Round 4预测数据
+// 生成Round 5预测数据
 function generatePredictionData() {
-    // 使用前2轮数据进行预测（Round 2 和 Round 3）
-    const periods = ['2', '3'];
+    // 使用前3轮数据进行预测（Round 2、3、4）
+    const periods = ['2', '3', '4'];
     const predictionData = {
         industryData: {},
         marketShare: {},
@@ -441,10 +441,10 @@ function loadAllData() {
         
         // 生成预测数据
         const predictionData = generatePredictionData();
-        allData['4'] = predictionData;
+        allData['5'] = predictionData;
         
         console.log('所有数据加载完成:', allData);
-        console.log('已生成Round 4预测数据:', predictionData);
+        console.log('已生成Round 5预测数据:', predictionData);
     } catch (error) {
         console.error('数据加载失败:', error);
     }
@@ -636,7 +636,7 @@ function displayData(period) {
     }
 
     const data = allData[period];
-    const isPrediction = period === '4';
+    const isPrediction = period === '5';
     
     // 显示/隐藏预测算法说明按钮
     const predictionButtons = document.querySelectorAll('.prediction-info-trigger');
@@ -671,7 +671,7 @@ function displayIndustryData(industryData) {
     const tbody = document.getElementById('industry-data-tbody');
     tbody.innerHTML = '';
 
-    const isPrediction = currentPeriod === '4';
+    const isPrediction = currentPeriod === '5';
     
     // 获取上一个期间的数据用于环比
     const prevPeriod = getPreviousPeriod(currentPeriod);
@@ -715,7 +715,7 @@ function displayMarketShareTable(marketShare) {
     const tbody = document.getElementById('market-share-tbody');
     tbody.innerHTML = '';
 
-    const isPrediction = currentPeriod === '4';
+    const isPrediction = currentPeriod === '5';
     
     // 获取上一个期间的数据用于环比
     const prevPeriod = getPreviousPeriod(currentPeriod);
@@ -759,7 +759,7 @@ function displayMarketPricingTable(marketPricing) {
     const tbody = document.getElementById('market-pricing-tbody');
     tbody.innerHTML = '';
 
-    const isPrediction = currentPeriod === '4';
+    const isPrediction = currentPeriod === '5';
     
     // 获取上一个期间的数据用于环比
     const prevPeriod = getPreviousPeriod(currentPeriod);
@@ -1536,7 +1536,7 @@ function showTrend(indicator, type) {
     title.textContent = `${indicator} - 趋势分析`;
     
     // 准备趋势数据
-    const periods = ['1A', '1B', '2', '3', '4'];
+    const periods = ['1A', '1B', '2', '3', '4', '5'];
     let allTrendData = [];
 
     if (type === 'industry') {
@@ -1669,8 +1669,8 @@ function createTrendChart(trendData, allTrendData = null, indicator = '', type =
 
     const datasets = trendData.map((item, index) => {
         // 分离预测数据点
-        const historicalData = item.data.filter(point => point.x !== '4');
-        const predictionData = item.data.filter(point => point.x === '4');
+        const historicalData = item.data.filter(point => point.x !== '5');
+        const predictionData = item.data.filter(point => point.x === '5');
         
         const baseColor = colors[index % colors.length];
         const datasets = [];
@@ -1886,11 +1886,16 @@ function calculateComparison(current, previous) {
 }
 
 // 格式化数值显示
-function formatValue(value) {
+function formatValue(value, metric = null) {
     if (value === null || value === undefined) {
         return '-';
     }
     if (typeof value === 'number') {
+        // 对于"整个行业订单"，始终显示完整数值
+        if (metric === '整个行业订单') {
+            return value.toLocaleString();
+        }
+        // 其他情况保持原有逻辑
         if (value >= 1000000) {
             return (value / 1000000).toFixed(1) + 'M';
         } else if (value >= 1000) {
@@ -2058,7 +2063,7 @@ function displayTeamComparison(teamCoordinates) {
     if (!tbody || !teamCoordinates) return;
     
     tbody.innerHTML = '';
-    const isPrediction = currentPeriod === '4';
+    const isPrediction = currentPeriod === '5';
 
     // 获取上一个期间的数据用于环比
     const prevPeriod = getPreviousPeriod(currentPeriod);
