@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>密码生成器 - 市场数据可视化分析平台</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .card-shadow {
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        }
+        .password-display {
+            font-family: 'Courier New', monospace;
+            letter-spacing: 2px;
+        }
+    </style>
+</head>
+<body class="gradient-bg min-h-screen flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl card-shadow p-8 w-full max-w-md">
+        <div class="text-center mb-8">
+            <h1 class="text-2xl font-bold text-gray-800 mb-2">密码生成器</h1>
+            <p class="text-gray-600 text-sm">输入管理密码获取访问码</p>
+        </div>
+
+        <!-- 管理密码输入 -->
+        <div class="mb-6">
+            <label class="block text-sm font-medium text-gray-700 mb-2">管理密码</label>
+            <input 
+                type="password" 
+                id="admin-password" 
+                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                placeholder="请输入管理密码"
+            >
+        </div>
+
+        <!-- 生成按钮 -->
+        <button 
+            id="generate-btn"
+            class="w-full bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors mb-6"
+        >
+            生成访问密码
+        </button>
+
+        <!-- 结果显示区域 -->
+        <div id="result-area" class="hidden">
+            <div class="bg-gray-50 rounded-lg p-4 mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-2">访问密码</label>
+                <div class="bg-white rounded border p-3 text-center">
+                    <span id="generated-password" class="password-display text-lg font-bold text-blue-600"></span>
+                </div>
+                <p class="text-xs text-gray-500 mt-2">此密码有效期：<span id="validity-time"></span></p>
+            </div>
+            
+            <div class="flex gap-2">
+                <button 
+                    id="copy-btn"
+                    class="flex-1 bg-green-600 text-white py-2 rounded-lg text-sm hover:bg-green-700 transition-colors"
+                >
+                    复制密码
+                </button>
+                <button 
+                    id="refresh-btn"
+                    class="flex-1 bg-gray-600 text-white py-2 rounded-lg text-sm hover:bg-gray-700 transition-colors"
+                >
+                    重新生成
+                </button>
+            </div>
+        </div>
+
+        <!-- 错误提示 -->
+        <div id="error-message" class="hidden bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mt-4">
+        </div>
+
+        <!-- 使用说明 -->
+        <div class="mt-8 text-center">
+            <a href="index.html" class="text-blue-600 hover:text-blue-800 text-sm transition-colors">
+                → 前往数据分析平台
+            </a>
+        </div>
+    </div>
+
+    <script>
+        // 管理密码（实际项目中应该更安全地存储）
+        const ADMIN_PASSWORD = 'admin2024';
+        
+        // 密码有效期（分钟）
+        const PASSWORD_VALIDITY = 1;
+
+        // 生成基于时间的密码
+        function generateTimeBasedPassword(seed) {
+            const now = new Date();
+            const timeSlot = Math.floor(now.getTime() / (PASSWORD_VALIDITY * 60 * 1000));
+            
+            // 使用简单的哈希算法生成密码
+            const combined = seed + timeSlot.toString();
+            let hash = 0;
+            for (let i = 0; i < combined.length; i++) {
+                const char = combined.charCodeAt(i);
+                hash = ((hash << 5) - hash) + char;
+                hash = hash & hash; // 转换为32位整数
+            }
+            
+            // 转换为6位数字密码
+            const password = Math.abs(hash).toString().slice(-6).padStart(6, '0');
+            return password;
+        }
+
+        // 计算密码过期时间
+        function getPasswordExpiry() {
+            const now = new Date();
+            const currentSlot = Math.floor(now.getTime() / (PASSWORD_VALIDITY * 60 * 1000));
+            const nextSlotTime = (currentSlot + 1) * PASSWORD_VALIDITY * 60 * 1000;
+            return new Date(nextSlotTime);
+        }
+
+        // 显示错误信息
+        function showError(message) {
+            const errorDiv = document.getElementById('error-message');
+            errorDiv.textContent = message;
+            errorDiv.classList.remove('hidden');
+        }
+
+        // 隐藏错误信息
+        function hideError() {
+            const errorDiv = document.getElementById('error-message');
+            errorDiv.classList.add('hidden');
+        }
+
+        // 显示生成结果
+        function showResult(password) {
+            const resultArea = document.getElementById('result-area');
+            const passwordSpan = document.getElementById('generated-password');
+            const validitySpan = document.getElementById('validity-time');
+            
+            passwordSpan.textContent = password;
+            
+            const expiry = getPasswordExpiry();
+            const remaining = Math.floor((expiry.getTime() - Date.now()) / 1000);
+            if (remaining > 60) {
+                validitySpan.textContent = `${Math.floor(remaining / 60)} 分钟 ${remaining % 60} 秒`;
+            } else {
+                validitySpan.textContent = `${remaining} 秒`;
+            }
+            
+            resultArea.classList.remove('hidden');
+        }
+
+        // 生成密码
+        function generatePassword() {
+            const adminPassword = document.getElementById('admin-password').value.trim();
+            
+            hideError();
+            
+            if (!adminPassword) {
+                showError('请输入管理密码');
+                return;
+            }
+            
+            if (adminPassword !== ADMIN_PASSWORD) {
+                showError('管理密码错误');
+                return;
+            }
+            
+            const password = generateTimeBasedPassword(adminPassword);
+            showResult(password);
+        }
+
+        // 复制密码
+        function copyPassword() {
+            const password = document.getElementById('generated-password').textContent;
+            navigator.clipboard.writeText(password).then(() => {
+                const btn = document.getElementById('copy-btn');
+                const originalText = btn.textContent;
+                btn.textContent = '已复制！';
+                btn.classList.add('bg-green-800');
+                setTimeout(() => {
+                    btn.textContent = originalText;
+                    btn.classList.remove('bg-green-800');
+                }, 2000);
+            });
+        }
+
+        // 事件监听器
+        document.getElementById('generate-btn').addEventListener('click', generatePassword);
+        document.getElementById('copy-btn').addEventListener('click', copyPassword);
+        document.getElementById('refresh-btn').addEventListener('click', generatePassword);
+        
+        // 回车键生成
+        document.getElementById('admin-password').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                generatePassword();
+            }
+        });
+
+        // 页面加载时聚焦输入框
+        document.getElementById('admin-password').focus();
+
+        // 实时倒计时更新
+        let countdownTimer = null;
+        
+        function startCountdown() {
+            if (countdownTimer) {
+                clearInterval(countdownTimer);
+            }
+            
+            countdownTimer = setInterval(() => {
+                const resultArea = document.getElementById('result-area');
+                if (!resultArea.classList.contains('hidden')) {
+                    const expiry = getPasswordExpiry();
+                    const remaining = Math.floor((expiry.getTime() - Date.now()) / 1000);
+                    const validitySpan = document.getElementById('validity-time');
+                    
+                    if (remaining <= 0) {
+                        // 密码已过期，隐藏结果并提示重新生成
+                        resultArea.classList.add('hidden');
+                        showError('密码已过期，请重新生成');
+                        clearInterval(countdownTimer);
+                    } else {
+                        if (remaining > 60) {
+                            validitySpan.textContent = `${Math.floor(remaining / 60)} 分钟 ${remaining % 60} 秒`;
+                        } else {
+                            validitySpan.textContent = `${remaining} 秒`;
+                        }
+                        
+                        // 最后10秒变红色警告
+                        if (remaining <= 10) {
+                            validitySpan.classList.add('text-red-600', 'font-bold');
+                        } else {
+                            validitySpan.classList.remove('text-red-600', 'font-bold');
+                        }
+                    }
+                }
+            }, 1000);
+        }
+
+        // 修改显示结果函数以启动倒计时
+        const originalShowResult = showResult;
+        showResult = function(password) {
+            originalShowResult(password);
+            startCountdown();
+        };
+    </script>
+</body>
+</html>

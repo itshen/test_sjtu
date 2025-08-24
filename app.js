@@ -2,8 +2,10 @@
 let currentPeriod = '1A';
 let allData = {};
 let coordinateCharts = {};
+let marketShareChart = null;
 let trendChart = null;
 let showComparison = false;
+let currentGroup = '1';
 
 // 期间顺序定义
 const periodOrder = ['1A', '1B', '2', '3'];
@@ -11,8 +13,16 @@ const periodOrder = ['1A', '1B', '2', '3'];
 // 页面加载完成后初始化
 document.addEventListener('DOMContentLoaded', function() {
     loadAllData();
+    initAuth();
     initEventListeners();
-    displayData(currentPeriod);
+    
+    // 检查是否已登录
+    if (authSystem.isSessionValid()) {
+        showMainContent();
+        startSessionTimer();
+    } else {
+        showLoginModal();
+    }
 });
 
 // 加载所有数据
@@ -59,6 +69,23 @@ function initEventListeners() {
     document.getElementById('show-comparison').addEventListener('change', function() {
         showComparison = this.checked;
         displayData(currentPeriod);
+    });
+
+    // 组别选择器
+    document.querySelectorAll('.group-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            // 更新按钮样式
+            document.querySelectorAll('.group-btn').forEach(b => {
+                b.classList.remove('bg-blue-500', 'text-white');
+                b.classList.add('bg-gray-300', 'text-gray-700');
+            });
+            this.classList.remove('bg-gray-300', 'text-gray-700');
+            this.classList.add('bg-blue-500', 'text-white');
+            
+            // 更新当前组别并显示数据
+            currentGroup = this.dataset.group;
+            displayMarketShare(allData[currentPeriod].marketShare);
+        });
     });
 
     // 键盘导航
@@ -151,43 +178,100 @@ function displayIndustryData(industryData) {
     });
 }
 
-// 显示市场份额表格
+// 显示市场份额饼图
 function displayMarketShare(marketShare) {
-    const tbody = document.getElementById('market-share-tbody');
-    tbody.innerHTML = '';
+    const ctx = document.getElementById('market-share-chart');
+    if (!ctx) return;
 
-    // 获取上一个期间的数据用于环比
-    const prevPeriod = getPreviousPeriod(currentPeriod);
-    const prevData = prevPeriod ? allData[prevPeriod]?.marketShare : null;
+    // 销毁之前的图表
+    if (marketShareChart) {
+        marketShareChart.destroy();
+    }
 
-    Object.keys(marketShare).forEach(group => {
-        const row = document.createElement('tr');
-        const cells = Object.keys(marketShare[group]).map(product => {
-            const currentValue = marketShare[group][product];
-            const prevValue = prevData ? prevData[group]?.[product] : null;
-            
-            let cellContent = `${currentValue}%`;
-            
-            if (showComparison && prevValue !== null && prevValue !== undefined) {
-                const comparison = calculateComparison(currentValue, prevValue);
-                if (comparison.change !== 0) {
-                    cellContent += `<br><span class="comparison-value ${comparison.className}">
-                        ${comparison.changeText}
-                    </span>`;
+    // 获取当前组的数据
+    const groupData = marketShare[currentGroup];
+    if (!groupData) return;
+
+    // 准备饼图数据
+    const labels = [];
+    const data = [];
+    const colors = [
+        '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF',
+        '#FF9F40', '#FF6384', '#C9CBCF', '#4BC0C0'
+    ];
+
+    Object.keys(groupData).forEach((product, index) => {
+        labels.push(product);
+        data.push(groupData[product]);
+    });
+
+    // 创建饼图
+    marketShareChart = new Chart(ctx, {
+        type: 'pie',
+        data: {
+            labels: labels,
+            datasets: [{
+                data: data,
+                backgroundColor: colors.slice(0, labels.length),
+                borderColor: '#fff',
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: false,
+            plugins: {
+                title: {
+                    display: true,
+                    text: `组${currentGroup} - 市场份额分布`,
+                    font: { size: 16, weight: 'bold' }
+                },
+                legend: {
+                    display: true,
+                    position: 'right',
+                    labels: {
+                        padding: 20,
+                        font: { size: 12 },
+                        generateLabels: function(chart) {
+                            const data = chart.data;
+                            if (data.labels.length && data.datasets.length) {
+                                return data.labels.map((label, i) => {
+                                    const value = data.datasets[0].data[i];
+                                    return {
+                                        text: `${label}: ${value}%`,
+                                        fillStyle: data.datasets[0].backgroundColor[i],
+                                        hidden: false,
+                                        index: i
+                                    };
+                                });
+                            }
+                            return [];
+                        }
+                    }
+                },
+                tooltip: {
+                    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                    titleColor: '#fff',
+                    bodyColor: '#fff',
+                    callbacks: {
+                        label: function(context) {
+                            const label = context.label || '';
+                            const value = context.parsed;
+                            return `${label}: ${value}%`;
+                        }
+                    }
+                }
+            },
+            onClick: function(event, elements) {
+                if (elements.length > 0) {
+                    const element = elements[0];
+                    const label = this.data.labels[element.index];
+                    // 可以添加点击产品的处理逻辑
+                    console.log(`点击了 ${label}`);
                 }
             }
-            
-            return `<td class="border border-gray-300 px-3 py-2 text-center text-sm">${cellContent}</td>`;
-        }).join('');
-
-        row.innerHTML = `
-            <td class="border border-gray-300 px-3 py-2 font-medium cursor-pointer hover:bg-blue-50 transition-colors text-sm" 
-                onclick="showTrend('组${group}', 'marketShare')" title="点击查看趋势">
-                组 ${group} 📈
-            </td>
-            ${cells}
-        `;
-        tbody.appendChild(row);
+        }
     });
 }
 
@@ -248,10 +332,7 @@ function displayCoordinateCharts(marketIdealValues) {
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                animation: {
-                    duration: 1000,
-                    easing: 'easeInOutQuart'
-                },
+                animation: false,
                 plugins: {
                     title: {
                         display: true,
@@ -589,10 +670,7 @@ function createTrendChart(trendData, allTrendData = null, indicator = '', type =
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            animation: {
-                duration: 800,
-                easing: 'easeInOutQuart'
-            },
+            animation: false,
             plugins: {
                 title: {
                     display: true,
@@ -722,4 +800,154 @@ function formatValue(value) {
         }
     }
     return value;
+}
+
+// 鉴权相关函数
+function initAuth() {
+    // 登录按钮事件
+    document.getElementById('login-btn').addEventListener('click', handleLogin);
+    
+    // 退出按钮事件
+    document.getElementById('logout-btn').addEventListener('click', handleLogout);
+    
+    // 回车键登录
+    document.getElementById('access-password').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            handleLogin();
+        }
+    });
+}
+
+function handleLogin() {
+    const password = document.getElementById('access-password').value.trim();
+    const errorDiv = document.getElementById('login-error');
+    
+    // 隐藏之前的错误
+    errorDiv.classList.add('hidden');
+    
+    if (!password) {
+        showLoginError('请输入访问密码');
+        return;
+    }
+    
+    if (password.length !== 6) {
+        showLoginError('访问密码必须是6位数字');
+        return;
+    }
+    
+    // 验证密码
+    if (authSystem.validateAccessPassword(password)) {
+        authSystem.setSession();
+        hideLoginModal();
+        showMainContent();
+        startSessionTimer();
+        
+        // 清空密码输入
+        document.getElementById('access-password').value = '';
+    } else {
+        showLoginError('访问密码错误，请检查后重试');
+    }
+}
+
+function handleLogout() {
+    authSystem.clearSession();
+    stopSessionTimer();
+    hideMainContent();
+    showLoginModal();
+}
+
+function showLoginError(message) {
+    const errorDiv = document.getElementById('login-error');
+    errorDiv.textContent = message;
+    errorDiv.classList.remove('hidden');
+}
+
+function showLoginModal() {
+    document.getElementById('login-modal').style.display = 'flex';
+    document.getElementById('session-info').classList.add('hidden');
+    
+    // 聚焦密码输入框
+    setTimeout(() => {
+        document.getElementById('access-password').focus();
+    }, 100);
+}
+
+function hideLoginModal() {
+    document.getElementById('login-modal').style.display = 'none';
+}
+
+function showMainContent() {
+    hideLoginModal();
+    // 不立即显示会话信息，等到剩余10分钟时才显示
+    displayData(currentPeriod);
+}
+
+function hideMainContent() {
+    document.getElementById('session-info').classList.add('hidden');
+}
+
+// 会话计时器
+let sessionTimer = null;
+
+function startSessionTimer() {
+    updateSessionTimer();
+    // 每30秒更新一次，以便及时显示最后一分钟的秒数
+    sessionTimer = setInterval(updateSessionTimer, 30000);
+}
+
+function stopSessionTimer() {
+    if (sessionTimer) {
+        clearInterval(sessionTimer);
+        sessionTimer = null;
+    }
+}
+
+function updateSessionTimer() {
+    const remaining = authSystem.getRemainingTime();
+    const sessionInfo = document.getElementById('session-info');
+    const timerSpan = document.getElementById('session-timer');
+    
+    if (remaining <= 0) {
+        // 会话过期，自动登出
+        handleLogout();
+        showLoginError('会话已过期，请重新登录');
+        return;
+    }
+    
+    // 只在剩余10分钟或更少时显示会话信息
+    if (remaining <= 10) {
+        sessionInfo.classList.remove('hidden');
+        
+        // 格式化时间显示
+        let timeDisplay;
+        if (remaining === 1) {
+            // 最后一分钟显示秒数
+            const remainingSeconds = Math.floor((authSystem.getSessionExpiry() - Date.now()) / 1000);
+            if (remainingSeconds <= 60) {
+                timeDisplay = `${remainingSeconds}秒`;
+                // 每秒更新一次
+                if (sessionTimer) {
+                    clearInterval(sessionTimer);
+                }
+                sessionTimer = setInterval(updateSessionTimer, 1000);
+            } else {
+                timeDisplay = '1分钟';
+            }
+        } else {
+            timeDisplay = `${remaining}分钟`;
+        }
+        
+        timerSpan.textContent = timeDisplay;
+        
+        // 添加警告样式
+        const container = timerSpan.parentElement.parentElement;
+        const indicator = container.querySelector('.rounded-full');
+        
+        container.classList.add('bg-yellow-50', 'border-yellow-200');
+        indicator.classList.remove('bg-green-500');
+        indicator.classList.add('bg-yellow-500');
+    } else {
+        // 超过10分钟时隐藏会话信息
+        sessionInfo.classList.add('hidden');
+    }
 }
