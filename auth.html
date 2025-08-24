@@ -215,10 +215,22 @@
                     const validitySpan = document.getElementById('validity-time');
                     
                     if (remaining <= 0) {
-                        // 密码已过期，隐藏结果并提示重新生成
-                        resultArea.classList.add('hidden');
-                        showError('密码已过期，请重新生成');
-                        clearInterval(countdownTimer);
+                        // 密码已过期，自动生成新密码
+                        const newPassword = generateTimeBasedPassword();
+                        const passwordSpan = document.getElementById('generated-password');
+                        passwordSpan.textContent = newPassword;
+                        
+                        // 重新计算有效期
+                        const newExpiry = getPasswordExpiry();
+                        const newRemaining = Math.floor((newExpiry.getTime() - Date.now()) / 1000);
+                        if (newRemaining > 60) {
+                            validitySpan.textContent = `${Math.floor(newRemaining / 60)} 分钟 ${newRemaining % 60} 秒`;
+                        } else {
+                            validitySpan.textContent = `${newRemaining} 秒`;
+                        }
+                        
+                        // 移除红色警告样式
+                        validitySpan.classList.remove('text-red-600', 'font-bold');
                     } else {
                         if (remaining > 60) {
                             validitySpan.textContent = `${Math.floor(remaining / 60)} 分钟 ${remaining % 60} 秒`;
