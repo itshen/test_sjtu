@@ -422,16 +422,10 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     loadAllData();
-    initAuth();
     initEventListeners();
     
-    // 检查是否已登录
-    if (authSystem.isSessionValid()) {
-        showMainContent();
-        startSessionTimer();
-    } else {
-        showLoginModal();
-    }
+    // 直接显示主内容，无需鉴权
+    displayData(currentPeriod);
 });
 
 // 加载所有数据
@@ -1923,155 +1917,25 @@ function formatValue(value, metric = null) {
     return value;
 }
 
-// 鉴权相关函数
-function initAuth() {
-    // 登录按钮事件
-    document.getElementById('login-btn').addEventListener('click', handleLogin);
-    
-    // 退出按钮事件
-    document.getElementById('logout-btn').addEventListener('click', handleLogout);
-    
-    // 回车键登录
-    document.getElementById('access-password').addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') {
-            handleLogin();
-        }
-    });
-}
 
-function handleLogin() {
-    const password = document.getElementById('access-password').value.trim();
-    const errorDiv = document.getElementById('login-error');
-    
-    // 隐藏之前的错误
-    errorDiv.classList.add('hidden');
-    
-    if (!password) {
-        showLoginError('请输入访问密码');
-        return;
-    }
-    
-    if (password.length !== 6) {
-        showLoginError('访问密码必须是6位数字');
-        return;
-    }
-    
-    // 验证密码
-    if (authSystem.validateAccessPassword(password)) {
-        authSystem.setSession();
-        hideLoginModal();
-        showMainContent();
-        startSessionTimer();
-        
-        // 清空密码输入
-        document.getElementById('access-password').value = '';
-    } else {
-        showLoginError('访问密码错误，请检查后重试');
-    }
-}
 
-function handleLogout() {
-    authSystem.clearSession();
-    stopSessionTimer();
-    hideMainContent();
-    showLoginModal();
-}
 
-function showLoginError(message) {
-    const errorDiv = document.getElementById('login-error');
-    errorDiv.textContent = message;
-    errorDiv.classList.remove('hidden');
-}
 
-function showLoginModal() {
-    document.getElementById('login-modal').style.display = 'flex';
-    document.getElementById('session-info').classList.add('hidden');
-    
-    // 聚焦密码输入框
-    setTimeout(() => {
-        document.getElementById('access-password').focus();
-    }, 100);
-}
 
-function hideLoginModal() {
-    document.getElementById('login-modal').style.display = 'none';
-}
 
-function showMainContent() {
-    hideLoginModal();
-    // 不立即显示会话信息，等到剩余10分钟时才显示
-    displayData(currentPeriod);
-}
 
-function hideMainContent() {
-    document.getElementById('session-info').classList.add('hidden');
-}
 
-// 会话计时器
-let sessionTimer = null;
 
-function startSessionTimer() {
-    updateSessionTimer();
-    // 每30秒更新一次，以便及时显示最后一分钟的秒数
-    sessionTimer = setInterval(updateSessionTimer, 30000);
-}
 
-function stopSessionTimer() {
-    if (sessionTimer) {
-        clearInterval(sessionTimer);
-        sessionTimer = null;
-    }
-}
 
-function updateSessionTimer() {
-    const remaining = authSystem.getRemainingTime();
-    const sessionInfo = document.getElementById('session-info');
-    const timerSpan = document.getElementById('session-timer');
-    
-    if (remaining <= 0) {
-        // 会话过期，自动登出
-        handleLogout();
-        showLoginError('会话已过期，请重新登录');
-        return;
-    }
-    
-    // 只在剩余10分钟或更少时显示会话信息
-    if (remaining <= 10) {
-        sessionInfo.classList.remove('hidden');
-        
-        // 格式化时间显示
-        let timeDisplay;
-        if (remaining === 1) {
-            // 最后一分钟显示秒数
-            const remainingSeconds = Math.floor((authSystem.getSessionExpiry() - Date.now()) / 1000);
-            if (remainingSeconds <= 60) {
-                timeDisplay = `${remainingSeconds}秒`;
-                // 每秒更新一次
-                if (sessionTimer) {
-                    clearInterval(sessionTimer);
-                }
-                sessionTimer = setInterval(updateSessionTimer, 1000);
-            } else {
-                timeDisplay = '1分钟';
-            }
-        } else {
-            timeDisplay = `${remaining}分钟`;
-        }
-        
-        timerSpan.textContent = timeDisplay;
-        
-        // 添加警告样式
-        const container = timerSpan.parentElement.parentElement;
-        const indicator = container.querySelector('.rounded-full');
-        
-        container.classList.add('bg-yellow-50', 'border-yellow-200');
-        indicator.classList.remove('bg-green-500');
-        indicator.classList.add('bg-yellow-500');
-    } else {
-        // 超过10分钟时隐藏会话信息
-        sessionInfo.classList.add('hidden');
-    }
-}
+
+
+
+
+
+
+
+
 
 // 显示各团队产品特性坐标对比表格
 function displayTeamComparison(teamCoordinates) {
